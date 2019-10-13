@@ -81,6 +81,8 @@ priority = [
 'ReadLine' = 'ReadLine'
 'static' = 'Static'
 'instanceof' = 'InstanceOf'
+'abstract' = 'Abstract'
+'var' = 'Var'
 '<=' = 'Le'
 '>=' = 'Ge'
 '==' = 'Eq'
@@ -126,9 +128,13 @@ impl<'p> Parser<'p> {
   #[rule(ClassList -> ClassDef)]
   fn class_list1(c: &'p ClassDef<'p>) -> Vec<&'p ClassDef<'p>> { vec![c] }
 
+  #[rule(ClassDef -> Abstract Class Id MaybeExtends LBrc FieldList RBrc)]
+  fn class_def1(&self, _a: Token, c: Token, name: Token, parent: Option<&'p str>, _l: Token, field: Vec<FieldDef<'p>>, _r: Token) -> &'p ClassDef<'p> {
+    self.alloc.class.alloc(ClassDef { loc: c.loc(), abstract_: true, name: name.str(), parent, field, parent_ref: dft(), scope: dft() })
+  }
   #[rule(ClassDef -> Class Id MaybeExtends LBrc FieldList RBrc)]
-  fn class_def(&self, c: Token, name: Token, parent: Option<&'p str>, _l: Token, field: Vec<FieldDef<'p>>, _r: Token) -> &'p ClassDef<'p> {
-    self.alloc.class.alloc(ClassDef { loc: c.loc(), name: name.str(), parent, field, parent_ref: dft(), scope: dft() })
+  fn class_def0(&self, c: Token, name: Token, parent: Option<&'p str>, _l: Token, field: Vec<FieldDef<'p>>, _r: Token) -> &'p ClassDef<'p> {
+    self.alloc.class.alloc(ClassDef { loc: c.loc(), name: name.str(), abstract_: false, parent, field, parent_ref: dft(), scope: dft() })
   }
 
   #[rule(MaybeExtends -> Extends Id)]
@@ -143,13 +149,17 @@ impl<'p> Parser<'p> {
   #[rule(FieldList ->)]
   fn field_list0() -> Vec<FieldDef<'p>> { vec![] }
 
+  #[rule(FuncDef -> Abstract Type Id LPar VarDefListOrEmpty RPar Semi)]
+  fn func_def2(&self, _a: Token, ret: SynTy<'p>, name: Token, _l: Token, param: Vec<&'p VarDef<'p>>, _r: Token, _s: Token) -> &'p FuncDef<'p> {
+    self.alloc.func.alloc(FuncDef { loc: name.loc(), name: name.str(), ret, param, static_: false, abstract_: true, body: None, ret_param_ty: dft(), class: dft(), scope: dft() })
+  }
   #[rule(FuncDef -> Static Type Id LPar VarDefListOrEmpty RPar Block)]
   fn func_def1(&self, _s: Token, ret: SynTy<'p>, name: Token, _l: Token, param: Vec<&'p VarDef<'p>>, _r: Token, body: Block<'p>) -> &'p FuncDef<'p> {
-    self.alloc.func.alloc(FuncDef { loc: name.loc(), name: name.str(), ret, param, static_: true, body, ret_param_ty: dft(), class: dft(), scope: dft() })
+    self.alloc.func.alloc(FuncDef { loc: name.loc(), name: name.str(), ret, param, static_: true, abstract_: false, body: Some(body), ret_param_ty: dft(), class: dft(), scope: dft() })
   }
   #[rule(FuncDef -> Type Id LPar VarDefListOrEmpty RPar Block)]
   fn func_def0(&self, ret: SynTy<'p>, name: Token, _l: Token, param: Vec<&'p VarDef<'p>>, _r: Token, body: Block<'p>) -> &'p FuncDef<'p> {
-    self.alloc.func.alloc(FuncDef { loc: name.loc(), name: name.str(), ret, param, static_: false, body, ret_param_ty: dft(), class: dft(), scope: dft() })
+    self.alloc.func.alloc(FuncDef { loc: name.loc(), name: name.str(), ret, param, static_: false, abstract_: false, body: Some(body), ret_param_ty: dft(), class: dft(), scope: dft() })
   }
 
   // the `VarDef` in grammar only supports VarDef without init value
@@ -215,6 +225,12 @@ impl<'p> Parser<'p> {
   fn simple_var_def_init(&self, syn_ty: SynTy<'p>, name: Token, a: Token, init: Expr<'p>) -> Stmt<'p> {
     let loc = name.loc();
     mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty, init: Some((a.loc(), init)), ty: dft(), owner: dft() })).into())
+  }
+  //TODO: check this!
+  #[rule(Simple -> Var Id Assign Expr)]
+  fn simple_auto_var_def(&self, v: Token, name: Token, a: Token, init: Expr<'p>) -> Stmt<'p> {
+    let loc = name.loc();
+    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty: SynTy { loc: v.loc(), arr: 0, kind: SynTyKind::None }, init: Some((a.loc(), init)), ty: dft(), owner: dft() })).into())
   }
   #[rule(Simple -> Expr)]
   fn simple_mk_expr(e: Expr<'p>) -> Stmt<'p> { mk_stmt(e.loc, e.into()) }

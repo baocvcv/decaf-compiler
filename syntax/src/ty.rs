@@ -8,6 +8,7 @@ pub enum SynTyKind<'a> {
   Bool,
   String,
   Void,
+  None,
   Named(&'a str),
 }
 
