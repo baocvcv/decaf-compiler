@@ -5,11 +5,6 @@ members = [
   "common",
   "print",
   "syntax",
-  "typeck",
-  "tac",
-  "tacgen",
-  "tacopt",
-  "codegen",
   "driver",
 ]
 

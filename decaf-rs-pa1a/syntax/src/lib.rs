@@ -2,7 +2,6 @@
 
 pub mod ast;
 pub mod parser;
-pub mod parser_ll;
 pub mod ty;
 pub mod symbol;
 
