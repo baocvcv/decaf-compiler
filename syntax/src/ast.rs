@@ -86,6 +86,7 @@ impl<'a> FuncDef<'a> {
   pub fn ret_ty(&self) -> Ty<'a> { self.ret_param_ty.get().unwrap()[0] }
 }
 
+
 pub struct VarDef<'a> {
   pub loc: Loc,
   pub name: &'a str,
@@ -176,6 +177,7 @@ pub enum ExprKind<'a> {
   NewArray(NewArray<'a>),
   ClassTest(ClassTest<'a>),
   ClassCast(ClassCast<'a>),
+  Lambda(Lambda<'a>),
 }
 
 pub struct VarSel<'a> {
@@ -230,6 +232,12 @@ pub struct ClassCast<'a> {
   pub class: Cell<Option<&'a ClassDef<'a>>>,
 }
 
+pub struct Lambda<'a> {
+  pub loc: Loc,
+  pub param: Vec<&'a VarDef<'a>>,
+  pub body: LambdaBody<'a>,
+}
+
 // some unit struct, they exist just to make match pattern consistent(all patterns are like Xxx(x))
 pub struct Skip;
 
@@ -242,3 +250,8 @@ pub struct This;
 pub struct ReadInt;
 
 pub struct ReadLine;
+
+pub struct LambdaBody<'a> {
+  pub expr: Option<Box<Expr<'a>>>,
+  pub body: Option<Block<'a>>,
+}

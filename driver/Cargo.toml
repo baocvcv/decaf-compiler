@@ -23,3 +23,7 @@ path = "src/cli.rs"
 [[bin]]
 name = "test"
 path = "src/test.rs"
+
+[[bin]]
+name = "test-one"
+path = "src/test-one.rs"

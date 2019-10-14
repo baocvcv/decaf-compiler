@@ -56,6 +56,13 @@ impl Printable for SynTy<'_> {
         write!(p, "TClass @ {:?}", self.loc).ignore();
         p.indent(|p| c.print(p));
       }
+      SynTyKind::Lambda => {
+        write!(p, "TLambda @ {:?}", self.loc).ignore();
+        p.indent(|p| {
+            self.rt.print(p);
+            self.tl.print(p);
+        })
+      }
     }
     for _ in 0..self.arr { p.dec(); }
   }
@@ -150,7 +157,21 @@ impl Printable for Expr<'_> {
       VarSel => x.owner x.name, IndexSel => x.arr x.idx, IntLit => x, BoolLit => x, StringLit => "\"".to_owned() + x + "\"",
       NullLit => , Call => x.func x.arg, Unary => x.op.to_word_str() x.r, Binary => x.op.to_word_str() x.l x.r,
       This => , ReadInt => , ReadLine => , NewClass => x.name, NewArray => x.elem x.len, ClassTest => x.expr x.name,
-      ClassCast => x.expr x.name
+      ClassCast => x.expr x.name, Lambda => x.param x.body
     );
   }
 }
+
+impl Printable for LambdaBody<'_> {
+  fn print(&self, p: &mut IndentPrinter) {
+      match self.expr {
+        None => (),
+        _ => self.expr.print(p),
+      }
+      match self.body {
+        None => (),
+        _ => self.body.print(p),
+      }
+  }
+}
+
