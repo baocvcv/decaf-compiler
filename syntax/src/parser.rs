@@ -55,7 +55,7 @@ priority = [
   { assoc = 'left', terms = ['Mul', 'Div', 'Mod'] },
   { assoc = 'no_assoc', terms = ['UMinus', 'Not'] },
   { assoc = 'no_assoc', terms = ['LBrk', 'Dot'] },
-  { assoc = 'no_assoc', terms = ['RPar', 'Empty'] },
+  { assoc = 'no_assoc', terms = ['LPar', 'RPar', 'Empty'] },
   { assoc = 'no_assoc', terms = ['Else'] },
 ]
 
@@ -306,6 +306,7 @@ impl<'p> Parser<'p> {
     mk_expr(i.loc(), ClassTest { expr: Box::new(e), name: name.str(), class: dft() }.into())
   }
   #[rule(Expr -> LPar Class Id RPar Expr)]
+  #[prec(To)]
   fn expr_cast(_l: Token, _c: Token, name: Token, _r: Token, e: Expr<'p>) -> Expr<'p> {
     mk_expr(e.loc, ClassCast { expr: Box::new(e), name: name.str(), class: dft() }.into())
   }
@@ -318,7 +319,6 @@ impl<'p> Parser<'p> {
   fn expr_not(n: Token, r: Expr<'p>) -> Expr<'p> {
     mk_expr(n.loc(), Unary { op: UnOp::Not, r: Box::new(r) }.into())
   }
-  //TODO: expr !!!
   #[rule(Expr -> Func LPar VarDefListOrEmpty RPar To Expr)]
   fn expr_lambda1(f: Token, _lp: Token, pa: Vec<&'p VarDef<'p>>, _rp: Token, _t: Token, e: Expr<'p>) -> Expr<'p> {
     mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, body: LambdaBody { expr: Some(Box::new(e)), body: None } }.into())
