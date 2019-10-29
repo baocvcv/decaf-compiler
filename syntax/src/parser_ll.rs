@@ -19,7 +19,7 @@ pub struct Parser<'p> {
 
 impl<'p> Parser<'p> {
   fn error(&mut self, token: &Token<'p>, lexer_loc: Loc) {
-    println!("Received error {:?} {:?}", token, lexer_loc);
+//    println!("Received error {:?} {:?}", token, lexer_loc);
     let loc = token.loc();
     match token.ty {
       TokenKind::_Err => if self.error.0.last().map(|x| x.0) != Some(loc) {
@@ -33,7 +33,7 @@ impl<'p> Parser<'p> {
 //        self.error.issue(Loc(loc.0, loc.1 + 1), ErrorKind::SyntaxError)
 //      }
       _ => if self.error.0.last().map(|x| x.0) != Some(loc) {
-        println!("Issued error {:?} {:?}", token, lexer_loc);
+//        println!("Issued error {:?} {:?}", token, lexer_loc);
         self.error.issue(loc, ErrorKind::SyntaxError)
       }
     }
@@ -48,24 +48,22 @@ impl<'p> Parser<'p> {
     let is_nt = |x: u32| x < NT_NUM;
 
     // For debug
-    print!("Current: {} ", lookahead.ty as u32);
+    print!("target: {} lookahead: {}@{:?} ", target, lookahead.ty as u32, lookahead.loc());
 
     let mut end = f.clone();
     end.extend(follow[target].iter());
     let table = &table[target];
-    let err: Vec<u32> = vec![];
     let (prod, rhs) = if let Some(x) = table.get(&(lookahead.ty as u32)) { x } else {
       self.error(lookahead, lexer.loc());
-      let pos = lexer.loc();
+      println!("{:?}", table);
       let ret = loop {
         if let Some(x) = table.get(&(lookahead.ty as u32)) {
-          println!("Can parse {}, {:?} at {:?}", lookahead.ty as u32, x, lexer.loc());
+          println!("In begin {}, {:?} at {:?}", lookahead.ty as u32, x, lexer.loc());
           break x
-        } else if let Some(x) = end.get(&(lookahead.ty as u32)) {
+        } else if let Some(_x) = end.get(&(lookahead.ty as u32)) {
           println!();
-          println!("Cannot parse {} at {:?}", lookahead.ty as u32, lexer.loc());
-//            lexer.line = pos.0;
-//            lexer.col = pos.1;
+          println!("In End {} at {:?}", lookahead.ty as u32, lexer.loc());
+          lexer.line = lookahead.loc().0;
           lexer.col = lookahead.loc().1;
           return StackItem::_Fail
         }
