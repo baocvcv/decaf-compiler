@@ -2,7 +2,7 @@ use crate::{ClassDef, FuncDef};
 use common::{Loc, Ref};
 use std::fmt;
 
-#[derive(Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum SynTyKind<'a> {
   Int,
   Bool,
@@ -13,7 +13,7 @@ pub enum SynTyKind<'a> {
   Named(&'a str),
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct SynTy<'a> {
   pub loc: Loc,
   pub arr: u32,
