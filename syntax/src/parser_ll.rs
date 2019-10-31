@@ -48,21 +48,21 @@ impl<'p> Parser<'p> {
     let is_nt = |x: u32| x < NT_NUM;
 
     // For debug
-    print!("target: {} lookahead: {}@{:?} ", target, lookahead.ty as u32, lookahead.loc());
+//    print!("target: {} lookahead: {}@{:?} ", target, lookahead.ty as u32, lookahead.loc());
 
     let mut end = f.clone();
     end.extend(follow[target].iter());
     let table = &table[target];
     let (prod, rhs) = if let Some(x) = table.get(&(lookahead.ty as u32)) { x } else {
       self.error(lookahead, lexer.loc());
-      println!("{:?}", table);
+//      println!("{:?}", table);
       let ret = loop {
         if let Some(x) = table.get(&(lookahead.ty as u32)) {
-          println!("In begin {}, {:?} at {:?}", lookahead.ty as u32, x, lexer.loc());
+//          println!("In begin {}, {:?} at {:?}", lookahead.ty as u32, x, lexer.loc());
           break x
         } else if let Some(_x) = end.get(&(lookahead.ty as u32)) {
-          println!();
-          println!("In End {} at {:?}", lookahead.ty as u32, lexer.loc());
+//          println!();
+//          println!("In End {} at {:?}", lookahead.ty as u32, lexer.loc());
           lexer.line = lookahead.loc().0;
           lexer.col = lookahead.loc().1;
           return StackItem::_Fail
@@ -72,7 +72,7 @@ impl<'p> Parser<'p> {
       ret
     };
     // for debug
-    println!(" P({}) {:?}", prod, rhs);
+//    println!(" P({}) {:?}", prod, rhs);
     let value_stk = rhs.iter().map(|&x| {
       if is_nt(x) {
         self._parse(x, lookahead, lexer, &end)
@@ -81,7 +81,7 @@ impl<'p> Parser<'p> {
         *lookahead = lexer.next();
         StackItem::_Token(token)
       } else {
-        println!("Cannot parse {} at {:?}", lookahead.ty as u32, lexer.loc());
+//        println!("Cannot parse {} at {:?}", lookahead.ty as u32, lexer.loc());
         self.error(lookahead, lexer.loc());
         StackItem::_Fail
       }
