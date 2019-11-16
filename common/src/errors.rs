@@ -73,6 +73,7 @@ pub enum ErrorKind<'a, Ty> {
   NoReturn,
   CannotBeAbstract(&'a str),
   CannotNewAbstract(&'a str),
+  ArgumentCannotBeVoid,
 }
 
 impl<Ty: fmt::Debug> fmt::Debug for ErrorKind<'_, Ty> {
@@ -115,7 +116,8 @@ impl<Ty: fmt::Debug> fmt::Debug for ErrorKind<'_, Ty> {
       IndexNotInt => write!(f, "array subscript must be an integer"),
       NoReturn => write!(f, "missing return statement: control reaches end of non-void block"),
       CannotBeAbstract(name) => write!(f, "'{}' is not abstract and does not override all abstract methods", name),
-      CannotNewAbstract(name) => write!(f, "cannot instantiate abstract class '{}'", name)
+      CannotNewAbstract(name) => write!(f, "cannot instantiate abstract class '{}'", name),
+      ArgumentCannotBeVoid => write!(f, "arguments in function type must be non-void known type"),
     }
   }
 }

@@ -3,6 +3,7 @@ use common::{ErrorKind::*, Loc, LENGTH, BinOp, UnOp, ErrorKind, Ref, HashSet, Ha
 use syntax::ast::*;
 use syntax::{ScopeOwner, Symbol, ty::*};
 use std::ops::{Deref, DerefMut};
+use std::iter;
 use std::cell::RefCell;
 
 pub(crate) struct TypePass<'a>(pub TypeCk<'a>);
@@ -180,7 +181,21 @@ impl<'a> TypePass<'a> {
       }
       // TODO: add lambda
       Lambda(l) => {
-
+        // now only inference of ret type is performed here
+        // but more could be added
+        let ty = if let Some(b) = &l.body.expr {
+          self.expr(b.deref())
+        } else {
+          match &l.body.body {
+            // inference of ret type for block
+            Some(b) => Ty::new(TyKind::Error),
+            _ => Ty::new(TyKind::Error)
+          }
+        };
+        let ret_param_ty = iter::once(ty).chain(l.param.iter().map(|v| v.ty.get()));
+        let ret_param_ty = self.alloc.ty.alloc_extend(ret_param_ty);
+        l.ret_param_ty.set(Some(ret_param_ty));
+        ty
       }
     };
     e.ty.set(ty);
@@ -216,6 +231,7 @@ impl<'a> TypePass<'a> {
       }
     } else {
       // if this stmt is in an VarDef, it cannot access the variable that is being declared
+      // TODO: need to check for special access
       if let Some(sym) = self.scopes.lookup_before(v.name, self.cur_var_def.map(|v| v.loc).unwrap_or(loc)) {
         match sym {
           Symbol::Var(var) => {
@@ -236,7 +252,7 @@ impl<'a> TypePass<'a> {
   }
 
   fn call(&mut self, c: &'a Call<'a>, loc: Loc) -> Ty<'a> {
-    println!("Call at ({}, {})", loc.0, loc.1);
+//    println!("Call at ({}, {})", loc.0, loc.1);
     let v = if let ExprKind::VarSel(v) = &c.func.kind { v } else { unimplemented!() };
     let owner = if let Some(owner) = &v.owner {
       self.cur_used = true;

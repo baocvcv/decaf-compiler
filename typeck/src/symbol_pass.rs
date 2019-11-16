@@ -1,6 +1,6 @@
 use crate::{TypeCk, TypeCkTrait};
 use common::{ErrorKind::*, Ref, MAIN_CLASS, MAIN_METHOD, NO_LOC, HashMap, HashSet};
-use syntax::{ast::*, ScopeOwner, Symbol, Ty, TyKind};
+use syntax::{ast::*, ScopeOwner, Symbol, Ty, TyKind, SynTyKind};
 use std::{ops::{Deref, DerefMut}, iter};
 use hashbrown::hash_map::Entry;
 
@@ -182,12 +182,11 @@ impl<'a> SymbolPass<'a> {
           let ret_ty = Ty::new(TyKind::Error); // dummy
           self.scoped(ScopeOwner::Lambda(f), |s| {
             for v in &f.param { s.var_def(v); }
-            if let Some(b) = f.body.body { s.block(&b); }
+            if let Some(b) = &f.body.body { s.block(b); }
           });
-
-          let ret_param_ty = iter::once(ret_ty).chain(f.param.iter().map(|v| v.ty.get()));
-          let ret_param_ty = self.alloc.ty.alloc_extend((ret_param_ty));
-          f.ret_param_ty.set(Some(ret_param_ty));
+          for v in &f.param {
+            if v.syn_ty.kind == SynTyKind::Void { self.issue(v.loc, ArgumentCannotBeVoid) }
+          }
           f.class.set(self.cur_class);
         }
       }

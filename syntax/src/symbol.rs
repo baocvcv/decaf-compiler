@@ -27,8 +27,9 @@ impl<'a> Symbol<'a> {
   pub fn loc(&self) -> Loc {
     match self {
       Symbol::Var(v) => v.loc,
-      Symbol::Func(f) | Symbol::This(f) | Symbol::Lambda(f) => f.loc,
+      Symbol::Func(f) | Symbol::This(f) => f.loc,
       Symbol::Class(c) => c.loc,
+      Symbol::Lambda(f) => f.loc,
     }
   }
 
@@ -91,7 +92,7 @@ impl fmt::Debug for Symbol<'_> {
         else { write!(f, "{:?} -> class {}", c.loc, c.name)?; }
         if let Some(p) = c.parent_ref.get() { write!(f, " : {}", p.name) } else { Ok(()) }
       }
-      Symbol::Lambda(fu) =>  write!(f, "{:?} -> function lambda@{} : {:?}", fu.loc, fu.loc, Ty::mk_lambda(fu)),
+      Symbol::Lambda(fu) =>  write!(f, "{:?} -> function lambda@{:?} : {:?}", fu.loc, fu.loc, Ty::mk_lambda(fu)),
     }
   }
 }

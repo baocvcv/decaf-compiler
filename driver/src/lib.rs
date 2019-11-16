@@ -3,7 +3,7 @@
 pub mod test_util;
 
 use common::{IndentPrinter, Errors};
-use syntax::{ASTAlloc, Ty, parser, parser_ll};
+use syntax::{ASTAlloc, Ty, parser};
 use typeck::TypeCkAlloc;
 
 pub use test_util::*;
@@ -31,7 +31,7 @@ pub struct Alloc<'a> {
 pub fn compile<'a>(code: &'a str, alloc: &'a Alloc<'a>, cfg: CompileCfg) -> Result<String, Errors<'a, Ty<'a>>> {
   let mut p = IndentPrinter::default();
   let pr = match cfg.parser {
-    Parser::LL => parser_ll::work(code, &alloc.ast)?,
+    Parser::LL => { unimplemented!() }, //parser_ll::work(code, &alloc.ast)?,
     Parser::LR => parser::work(code, &alloc.ast)?,
   };
   if cfg.stage == Stage::Parse {
