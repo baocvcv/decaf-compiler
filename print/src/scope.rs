@@ -1,6 +1,7 @@
 use common::{IndentPrinter, IgnoreResult};
 use syntax::{ast::*, Scope};
 use std::fmt::Write;
+use std::borrow::Borrow;
 
 fn show_scope(s: &Scope, p: &mut IndentPrinter) {
   let mut s = s.iter().map(|(_, &sym)| sym).collect::<Vec<_>>();
@@ -30,7 +31,8 @@ pub fn func_def(f: &FuncDef, p: &mut IndentPrinter) {
   write!(p, "FORMAL SCOPE OF '{}':", f.name).ignore();
   p.indent(|p| {
     show_scope(&f.scope.borrow(), p);
-    block(&f.body, p);
+    //TODO: modify for abstract function
+    if !f.abstract_ { block(&f.body.as_ref().unwrap(), p); }
   });
 }
 

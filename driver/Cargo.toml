@@ -8,6 +8,7 @@ edition = "2018"
 common = { path = "../common" }
 print = { path = "../print" }
 syntax = { path = "../syntax" }
+typeck = { path = "../typeck" }
 typed-arena = "1.4.1"
 tacvm = { git = "https://github.com/MashPlant/tacvm" }
 colored = "1.8"
@@ -23,3 +24,7 @@ path = "src/cli.rs"
 [[bin]]
 name = "test"
 path = "src/test.rs"
+
+[[bin]]
+name = "one"
+path = "src/test-one.rs"

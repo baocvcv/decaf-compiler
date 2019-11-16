@@ -4,6 +4,7 @@ pub mod test_util;
 
 use common::{IndentPrinter, Errors};
 use syntax::{ASTAlloc, Ty, parser, parser_ll};
+use typeck::TypeCkAlloc;
 
 pub use test_util::*;
 
@@ -22,6 +23,7 @@ pub struct CompileCfg {
 #[derive(Default)]
 pub struct Alloc<'a> {
   ast: ASTAlloc<'a>,
+  typeck: TypeCkAlloc<'a>,
 }
 
 // it is recommended to use this function to debug your compiler
@@ -34,6 +36,11 @@ pub fn compile<'a>(code: &'a str, alloc: &'a Alloc<'a>, cfg: CompileCfg) -> Resu
   };
   if cfg.stage == Stage::Parse {
     print::ast::program(&pr, &mut p);
+    return Ok(p.finish());
+  }
+  typeck::work(&pr, &alloc.typeck)?;
+  if cfg.stage == Stage::TypeCk {
+    print::scope::program(&pr, &mut p);
     return Ok(p.finish());
   }
   unimplemented!()

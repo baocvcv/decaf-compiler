@@ -1,6 +1,6 @@
 use crate::{ast::*, ty::*, VecExt, dft, check_str, mk_stmt, mk_expr, mk_int_lit, mk_block};
 use parser_macros::lalr1;
-use common::{ErrorKind, Loc, BinOp, UnOp, Errors, NO_LOC};
+use common::{ErrorKind, Loc, BinOp, UnOp, Errors, NO_LOC,};
 
 pub fn work<'p>(code: &'p str, alloc: &'p ASTAlloc<'p>) -> Result<&'p Program<'p>, Errors<'p, Ty<'p>>> {
   let mut parser = Parser { alloc, error: Errors::default() };
@@ -133,11 +133,11 @@ impl<'p> Parser<'p> {
 
   #[rule(ClassDef -> Abstract Class Id MaybeExtends LBrc FieldList RBrc)]
   fn class_def1(&self, _a: Token, c: Token, name: Token, parent: Option<&'p str>, _l: Token, field: Vec<FieldDef<'p>>, _r: Token) -> &'p ClassDef<'p> {
-    self.alloc.class.alloc(ClassDef { loc: c.loc(), abstract_: true, name: name.str(), parent, field, parent_ref: dft(), scope: dft() })
+    self.alloc.class.alloc(ClassDef { loc: c.loc(), abstract_: true, name: name.str(), parent, field, parent_ref: dft(), scope: dft(), })
   }
   #[rule(ClassDef -> Class Id MaybeExtends LBrc FieldList RBrc)]
   fn class_def0(&self, c: Token, name: Token, parent: Option<&'p str>, _l: Token, field: Vec<FieldDef<'p>>, _r: Token) -> &'p ClassDef<'p> {
-    self.alloc.class.alloc(ClassDef { loc: c.loc(), name: name.str(), abstract_: false, parent, field, parent_ref: dft(), scope: dft() })
+    self.alloc.class.alloc(ClassDef { loc: c.loc(), name: name.str(), abstract_: false, parent, field, parent_ref: dft(), scope: dft(), })
   }
 
   #[rule(MaybeExtends -> Extends Id)]
@@ -232,7 +232,7 @@ impl<'p> Parser<'p> {
   #[rule(Simple -> Var Id Assign Expr)]
   fn simple_auto_var_def(&self, v: Token, name: Token, a: Token, init: Expr<'p>) -> Stmt<'p> {
     let loc = name.loc();
-    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty: SynTy { loc: v.loc(), arr: 0, kind: SynTyKind::None, rt: None, tl: vec![] }, init: Some((a.loc(), init)), ty: dft(), owner: dft() })).into())
+    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty: SynTy { loc: v.loc(), arr: 0, kind: SynTyKind::Var, rt: None, tl: vec![] }, init: Some((a.loc(), init)), ty: dft(), owner: dft() })).into())
   }
   #[rule(Simple -> Expr)]
   fn simple_mk_expr(e: Expr<'p>) -> Stmt<'p> { mk_stmt(e.loc, e.into()) }

@@ -1,8 +1,9 @@
 use crate::{TypeCk, TypeCkTrait};
-use common::{ErrorKind::*, Loc, LENGTH, BinOp, UnOp, ErrorKind, Ref};
+use common::{ErrorKind::*, Loc, LENGTH, BinOp, UnOp, ErrorKind, Ref, HashSet, HashMap};
 use syntax::ast::*;
 use syntax::{ScopeOwner, Symbol, ty::*};
 use std::ops::{Deref, DerefMut};
+use std::cell::RefCell;
 
 pub(crate) struct TypePass<'a>(pub TypeCk<'a>);
 
@@ -21,12 +22,15 @@ impl<'a> TypePass<'a> {
   }
 
   fn class_def(&mut self, c: &'a ClassDef<'a>) {
+//    println!("Class {}", c.name);
     self.cur_class = Some(c);
     self.scoped(ScopeOwner::Class(c), |s| for f in &c.field {
       if let FieldDef::FuncDef(f) = f {
         s.cur_func = Some(f);
-        let ret = s.scoped(ScopeOwner::Param(f), |s| s.block(&f.body));
-        if !ret && f.ret_ty() != Ty::void() { s.issue(f.body.loc, ErrorKind::NoReturn) }
+        if !f.abstract_ { // if not abstract
+          let ret = s.scoped(ScopeOwner::Param(f), |s| s.block(&f.body.as_ref().unwrap()));
+          if !ret && f.ret_ty() != Ty::void() { s.issue(f.body.as_ref().unwrap().loc, ErrorKind::NoReturn) }
+        }
       };
     });
   }
@@ -49,7 +53,11 @@ impl<'a> TypePass<'a> {
         self.cur_var_def = Some(v);
         if let Some((loc, e)) = &v.init {
           let (l, r) = (v.ty.get(), self.expr(e));
-          if !r.assignable_to(l) { self.issue(*loc, IncompatibleBinary { l, op: "=", r }) }
+          // TODO: how to assign inferred def to var???
+          if v.syn_ty.kind == SynTyKind::Var {
+            v.ty.set( self.expr(e).clone());
+            if v.ty.get().kind == TyKind::Void { self.issue(v.loc, VoidVar(v.name)) }
+          } else if !r.assignable_to(l) { self.issue(*loc, IncompatibleBinary { l, op: "=", r }) }
         }
         self.cur_var_def = None;
         false
@@ -144,6 +152,8 @@ impl<'a> TypePass<'a> {
         Ty::mk_obj(self.cur_class.unwrap())
       }
       NewClass(n) => if let Some(c) = self.scopes.lookup_class(n.name) {
+        // class cannot be abstract
+        if c.abstract_ { self.issue(e.loc, CannotNewAbstract(c.name)) }
         n.class.set(Some(c));
         Ty::mk_obj(c)
       } else { self.issue(e.loc, NoSuchClass(n.name)) },
@@ -168,6 +178,8 @@ impl<'a> TypePass<'a> {
           Ty::mk_obj(cl)
         } else { self.issue(e.loc, NoSuchClass(c.name)) }
       }
+      // TODO: add lambda
+      Lambda(l) => { unimplemented!() }
     };
     e.ty.set(ty);
     ty
@@ -189,7 +201,7 @@ impl<'a> TypePass<'a> {
           match sym {
             Symbol::Var(var) => {
               v.var.set(Some(var));
-              // only allow self & descendents to access field
+              // only allow self & descendants to access field
               if !self.cur_class.unwrap().extends(c) {
                 self.issue(loc, PrivateFieldAccess { name: v.name, owner })
               }
@@ -222,6 +234,7 @@ impl<'a> TypePass<'a> {
   }
 
   fn call(&mut self, c: &'a Call<'a>, loc: Loc) -> Ty<'a> {
+    println!("Call at ({}, {})", loc.0, loc.1);
     let v = if let ExprKind::VarSel(v) = &c.func.kind { v } else { unimplemented!() };
     let owner = if let Some(owner) = &v.owner {
       self.cur_used = true;

@@ -51,6 +51,9 @@ impl<'a> TypeCk<'a> {
       SynTyKind::Named(name) => if let Some(c) = self.scopes.lookup_class(name) {
         TyKind::Object(Ref(c))
       } else { self.issue(s.loc, NoSuchClass(name)) },
+      // TODO: update this
+      SynTyKind::Lambda => TyKind::Error,
+      SynTyKind::Var => TyKind::Error,
     };
     match kind {
       TyKind::Error => Ty::error(),

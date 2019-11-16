@@ -349,7 +349,7 @@ impl<'p> Parser<'p> {
   #[rule(Simple -> Var Id Assign Expr)]
   fn simple_auto_var_def(&self, v: Token, name: Token, a: Token, init: Expr<'p>) -> Stmt<'p> {
     let loc = name.loc();
-    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty: SynTy { loc: v.loc(), arr: 0, kind: SynTyKind::None, rt: None, tl: vec![] }, init: Some((a.loc(), init)), ty: dft(), owner: dft() })).into())
+    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty: SynTy { loc: v.loc(), arr: 0, kind: SynTyKind::Var, rt: None, tl: vec![] }, init: Some((a.loc(), init)), ty: dft(), owner: dft() })).into())
   }
   #[rule(Simple -> Type Id MaybeAssign)]
   fn simple_var_def(&self, syn_ty: SynTy<'p>, name: Token, init: Option<(Loc, Expr<'p>)>) -> Stmt<'p> {
