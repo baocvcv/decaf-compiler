@@ -321,11 +321,11 @@ impl<'p> Parser<'p> {
   }
   #[rule(Expr -> Func LPar VarDefListOrEmpty RPar To Expr)]
   fn expr_lambda1(f: Token, _lp: Token, pa: Vec<&'p VarDef<'p>>, _rp: Token, _t: Token, e: Expr<'p>) -> Expr<'p> {
-    mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, body: LambdaBody { expr: Some(Box::new(e)), body: None } }.into())
+    mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, body: LambdaBody { expr: Some(Box::new(e)), body: None }, ret_param_ty: dft(), class: dft(), scope: dft() }.into())
   }
   #[rule(Expr -> Func LPar VarDefListOrEmpty RPar Block)]
   fn expr_lambda0(f: Token, _lp: Token, pa: Vec<&'p VarDef<'p>>, _rp: Token, b: Block<'p>) -> Expr<'p> {
-    mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, body: LambdaBody { expr: None, body: Some(b) } }.into())
+    mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, body: LambdaBody { expr: None, body: Some(b) }, ret_param_ty: dft(), class: dft(), scope: dft() }.into())
   }
 
   #[rule(ExprList -> ExprList Comma Expr)]

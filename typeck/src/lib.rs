@@ -52,7 +52,7 @@ impl<'a> TypeCk<'a> {
         TyKind::Object(Ref(c))
       } else { self.issue(s.loc, NoSuchClass(name)) },
       // TODO: update this
-      SynTyKind::Lambda => TyKind::Error,
+      SynTyKind::Lambda => TyKind::Error, // only temporary
       SynTyKind::Var => TyKind::Error,
     };
     match kind {

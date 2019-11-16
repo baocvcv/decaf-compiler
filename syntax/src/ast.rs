@@ -236,6 +236,10 @@ pub struct Lambda<'a> {
   pub loc: Loc,
   pub param: Vec<&'a VarDef<'a>>,
   pub body: LambdaBody<'a>,
+  // Same as FuncDef
+  pub ret_param_ty: Cell<Option<&'a [Ty<'a>]>>,
+  pub class: Cell<Option<&'a ClassDef<'a>>>,
+  pub scope: RefCell<Scope<'a>>,
 }
 
 // some unit struct, they exist just to make match pattern consistent(all patterns are like Xxx(x))

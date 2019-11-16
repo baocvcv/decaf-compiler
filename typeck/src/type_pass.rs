@@ -179,7 +179,9 @@ impl<'a> TypePass<'a> {
         } else { self.issue(e.loc, NoSuchClass(c.name)) }
       }
       // TODO: add lambda
-      Lambda(l) => { unimplemented!() }
+      Lambda(l) => {
+
+      }
     };
     e.ty.set(ty);
     ty

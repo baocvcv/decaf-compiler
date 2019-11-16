@@ -1,4 +1,4 @@
-use crate::{Block, ClassDef, FuncDef, VarDef, Program, Ty};
+use crate::{Block, ClassDef, FuncDef, VarDef, Program, Ty, Lambda, LambdaBody};
 use common::{Loc, HashMap};
 use std::{cell::{RefMut, Ref}, fmt};
 
@@ -10,6 +10,7 @@ pub enum Symbol<'a> {
   Func(&'a FuncDef<'a>),
   This(&'a FuncDef<'a>),
   Class(&'a ClassDef<'a>),
+  Lambda(&'a Lambda<'a>),
 }
 
 impl<'a> Symbol<'a> {
@@ -19,13 +20,14 @@ impl<'a> Symbol<'a> {
       Symbol::Func(f) => f.name,
       Symbol::This(_) => "this",
       Symbol::Class(c) => c.name,
+      Symbol::Lambda(_) => "lambda",
     }
   }
 
   pub fn loc(&self) -> Loc {
     match self {
       Symbol::Var(v) => v.loc,
-      Symbol::Func(f) | Symbol::This(f) => f.loc,
+      Symbol::Func(f) | Symbol::This(f) | Symbol::Lambda(f) => f.loc,
       Symbol::Class(c) => c.loc,
     }
   }
@@ -37,6 +39,7 @@ impl<'a> Symbol<'a> {
       Symbol::Func(f) => Ty::mk_func(f),
       Symbol::This(f) => Ty::mk_obj(f.class.get().unwrap()),
       Symbol::Class(c) => Ty::mk_obj(c),
+      Symbol::Lambda(f) => Ty::mk_lambda(f),
     }
   }
 
@@ -44,32 +47,37 @@ impl<'a> Symbol<'a> {
   pub fn is_func(&self) -> bool { if let Symbol::Func(_) = self { true } else { false } }
   pub fn is_this(&self) -> bool { if let Symbol::This(_) = self { true } else { false } }
   pub fn is_class(&self) -> bool { if let Symbol::Class(_) = self { true } else { false } }
+  pub fn is_lambda(&self) -> bool { if let Symbol::Lambda(_) = self { true } else { false } }
+
 }
 
 #[derive(Copy, Clone)]
 pub enum ScopeOwner<'a> {
-  Local(&'a Block<'a>),
-  Param(&'a FuncDef<'a>),
-  Class(&'a ClassDef<'a>),
-  Global(&'a Program<'a>),
-}
-
-impl<'a> ScopeOwner<'a> {
-  // boilerplate code...
-  pub fn scope(&self) -> Ref<'a, Scope<'a>> {
-    use ScopeOwner::*;
-    match self { Local(x) => x.scope.borrow(), Param(x) => x.scope.borrow(), Class(x) => x.scope.borrow(), Global(x) => x.scope.borrow(), }
+  // TODO: think about this
+    Lambda(&'a Lambda<'a>),
+    Local(&'a Block<'a>),
+    Param(&'a FuncDef<'a>),
+    Class(&'a ClassDef<'a>),
+    Global(&'a Program<'a>),
   }
 
-  pub fn scope_mut(&self) -> RefMut<'a, Scope<'a>> {
-    use ScopeOwner::*;
-    match self { Local(x) => x.scope.borrow_mut(), Param(x) => x.scope.borrow_mut(), Class(x) => x.scope.borrow_mut(), Global(x) => x.scope.borrow_mut(), }
-  }
+  impl<'a> ScopeOwner<'a> {
+    // boilerplate code...
+    pub fn scope(&self) -> Ref<'a, Scope<'a>> {
+      use ScopeOwner::*;
+      match self { Lambda(x) => x.scope.borrow(), Local(x) => x.scope.borrow(), Param(x) => x.scope.borrow(), Class(x) => x.scope.borrow(), Global(x) => x.scope.borrow(), }
+    }
 
-  pub fn is_local(&self) -> bool { if let ScopeOwner::Local(_) = self { true } else { false } }
-  pub fn is_param(&self) -> bool { if let ScopeOwner::Param(_) = self { true } else { false } }
-  pub fn is_class(&self) -> bool { if let ScopeOwner::Class(_) = self { true } else { false } }
-  pub fn is_global(&self) -> bool { if let ScopeOwner::Global(_) = self { true } else { false } }
+    pub fn scope_mut(&self) -> RefMut<'a, Scope<'a>> {
+      use ScopeOwner::*;
+      match self { Lambda(x) => x.scope.borrow_mut(), Local(x) => x.scope.borrow_mut(), Param(x) => x.scope.borrow_mut(), Class(x) => x.scope.borrow_mut(), Global(x) => x.scope.borrow_mut(), }
+    }
+
+    pub fn is_lambda(&self) -> bool { if let ScopeOwner::Lambda(_) = self { true } else { false } }
+    pub fn is_local(&self) -> bool { if let ScopeOwner::Local(_) = self { true } else { false } }
+    pub fn is_param(&self) -> bool { if let ScopeOwner::Param(_) = self { true } else { false } }
+    pub fn is_class(&self) -> bool { if let ScopeOwner::Class(_) = self { true } else { false } }
+    pub fn is_global(&self) -> bool { if let ScopeOwner::Global(_) = self { true } else { false } }
 }
 
 impl fmt::Debug for Symbol<'_> {
@@ -83,6 +91,7 @@ impl fmt::Debug for Symbol<'_> {
         else { write!(f, "{:?} -> class {}", c.loc, c.name)?; }
         if let Some(p) = c.parent_ref.get() { write!(f, " : {}", p.name) } else { Ok(()) }
       }
+      Symbol::Lambda(fu) =>  write!(f, "{:?} -> function lambda@{} : {:?}", fu.loc, fu.loc, Ty::mk_lambda(fu)),
     }
   }
 }

@@ -1,4 +1,4 @@
-use crate::{ClassDef, FuncDef};
+use crate::{ClassDef, FuncDef, Lambda};
 use common::{Loc, Ref};
 use std::fmt;
 
@@ -37,6 +37,7 @@ pub enum TyKind<'a> {
   Class(Ref<'a, ClassDef<'a>>),
   // [0] = ret, [1..] = param
   Func(&'a [Ty<'a>]),
+  Lambda(&'a [Ty<'a>]),
 }
 
 impl Default for TyKind<'_> {
@@ -88,6 +89,7 @@ impl<'a> Ty<'a> {
   pub fn mk_obj(c: &'a ClassDef<'a>) -> Ty<'a> { Ty::new(TyKind::Object(Ref(c))) }
   pub fn mk_class(c: &'a ClassDef<'a>) -> Ty<'a> { Ty::new(TyKind::Class(Ref(c))) }
   pub fn mk_func(f: &'a FuncDef<'a>) -> Ty<'a> { Ty::new(TyKind::Func(f.ret_param_ty.get().unwrap())) }
+  pub fn mk_lambda(f: &'a Lambda<'a>) -> Ty<'a> { Ty::new(TyKind::Lambda(f.ret_param_ty.get().unwrap())) }
 
   // if you want something like `is_void()`, just use `== Ty::void()`
   pub fn is_arr(&self) -> bool { self.arr > 0 }
@@ -109,7 +111,7 @@ impl fmt::Debug for Ty<'_> {
       // the printing format may be different from other experiment framework's
       // it is not because their format is hard to implement in rust, but because I simply don't like their format,
       // which introduces unnecessary complexity, and doesn't increase readability
-      TyKind::Func(ret_param) => {
+      TyKind::Func(ret_param) | TyKind::Lambda(ret_param) => {
         let (ret, param) = (ret_param[0], &ret_param[1..]);
         write!(f, "{:?}(", ret)?;
         for (idx, p) in param.iter().enumerate() {
