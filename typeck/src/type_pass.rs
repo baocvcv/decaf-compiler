@@ -5,6 +5,7 @@ use syntax::{ScopeOwner, Symbol, ty::*};
 use std::ops::{Deref, DerefMut};
 use std::iter;
 use std::cell::RefCell;
+use std::cell::Cell;
 use std::borrow::Borrow;
 
 pub(crate) struct TypePass<'a>(pub TypeCk<'a>);
@@ -24,7 +25,7 @@ impl<'a> TypePass<'a> {
   }
 
   fn class_def(&mut self, c: &'a ClassDef<'a>) {
-    println!("Class {}", c.name);
+//    println!("Class {}", c.name);
     self.cur_class = Some(c);
     self.scoped(ScopeOwner::Class(c), |s| for f in &c.field {
       if let FieldDef::FuncDef(f) = f {
@@ -38,63 +39,15 @@ impl<'a> TypePass<'a> {
   }
 
   fn block(&mut self, b: &'a Block<'a>) -> bool {
-    //TODO: record the ret type of block
-    println!("In block @ {:?}", b.loc);
+//    println!("In block @ {:?}", b.loc);
     let mut ret = false;
     self.scoped(ScopeOwner::Local(b), |s| for st in &b.stmt { ret = s.stmt(st); });
     ret
-
-//    self.scopes.open(ScopeOwner::Local(b));
-//    for st in &b.stmt {
-//      self.stmt(st);
-//      let ty = match &st.kind {
-//        StmtKind::Return(o) => {
-//          let ty = &o.as_ref().unwrap().ty.get();
-//          println!("Return type is {:?} @ {:?}", ty, st.loc);
-////          if b.ret_ty.get().kind == TyKind::Void { b.ret_ty.set(*ty); }
-////          else if b.ret_ty.get().assignable_to(*ty) { b.ret_ty.set(*ty); }
-////          else if ty.assignable_to(b.ret_ty.get()) {}
-////          else { self.issue(st.loc, BadReturnInBlock) }
-//          o.as_ref().unwrap().ty.get()
-//        },
-//        StmtKind::Block(block) => {
-//          let ty = &block.ret_ty.get();
-//          println!("Return type is {:?} @ {:?}", ty, st.loc);
-////          if block.ret_ty.get().kind == TyKind::Void { block.ret_ty.set(*ty); }
-////          else if block.ret_ty.get().assignable_to(*ty) { block.ret_ty.set(*ty); }
-////          else if ty.assignable_to(block.ret_ty.get()) {}
-////          else { self.issue(b.loc, BadReturnInBlock) }
-//          block.ret_ty.get()
-//        }
-//        StmtKind::If(i) => {
-//          i.ret_ty.set(i.on_true.ret_ty.get());
-//          if let Some(block) = &i.on_false {
-//            if block.ret_ty.get().kind == TyKind::Void {
-//              if i.ret_ty.get().kind == TyKind::Void {}
-//              else { self.issue(b.loc, NoReturn) }
-//            } else if !i.ret_ty.get().assignable_to(block.ret_ty.get()) {
-//              self.issue(b.loc, BadReturnInBlock)
-//            } else {
-//              i.ret_ty.set(block.ret_ty.get());
-//            }
-//          }
-//          i.ret_ty.get()
-//        }
-//        _ => { Ty::new(TyKind::Void) }
-//      };
-//      if b.ret_ty.get().kind == TyKind::Void { b.ret_ty.set(ty); }
-//      else if b.ret_ty.get().assignable_to(ty) { b.ret_ty.set(ty); }
-//      else if ty.assignable_to(b.ret_ty.get()) {}
-//      else { self.issue(b.loc, BadReturnInBlock) }
-//    }
-//    self.scopes.close();
-//    if b.ret_ty.get().kind == TyKind::Void { false }
-//    else { true }
   }
 
   // return whether this stmt has a return value
   fn stmt(&mut self, s: &'a Stmt<'a>) -> bool {
-    println!("Statement @ {:?}", s.loc);
+//    println!("Statement @ {:?}", s.loc);
     match &s.kind {
       StmtKind::Assign(a) => {
         let (l, r) = (self.expr(&a.dst), self.expr(&a.src));
@@ -285,8 +238,26 @@ impl<'a> TypePass<'a> {
           self.lambda_cnt += 1;
           self.scopes.open(ScopeOwner::Lambda(l));
           let has_ret = self.block(b);
-          ty = self.dfs_lambda(b);
-          if !has_ret && ty.kind != TyKind::Void { self.issue(b.loc, NoReturn) }
+          // check all the exprs in a lambda
+          let mut ret_ty = self.dfs_lambda(b);
+          ty = if ret_ty.is_empty() {
+            Ty::new(TyKind::Void)
+          } else {
+            // lambda contains ret statement
+            if !has_ret { self.issue(b.loc, NoReturn) }
+            // figure out the ret type
+            let mut max_type = &ret_ty.pop().unwrap();
+            for types in &ret_ty {
+              if types.get().assignable_to(max_type.get()) {}
+              else if max_type.get().assignable_to(types.get()) {
+                max_type = types;
+              } else {
+                println!("Incompatible {:?} - {:?}", types.get(), max_type.get());
+                self.issue(b.loc, BadReturnInBlock)
+              }
+            }
+            max_type.get()
+          };
           self.scopes.close();
           self.lambda_cnt -= 1;
         };
@@ -300,9 +271,11 @@ impl<'a> TypePass<'a> {
     ty
   }
 
-  fn dfs_lambda(&mut self, b: &'a Block<'a>) -> Ty<'a> {
+  fn dfs_lambda(&mut self, b: &'a Block<'a>) -> (bool, Vec<&'a Cell<Ty<'a>>>) {
+    print!("Searched block @ {:?}: ", b.loc);
     let mut st = vec![];
     let mut ret_ty = vec![];
+    let mut need_ret = false;
     st.push(b);
     while !st.is_empty() {
       let block = st.pop().unwrap();
@@ -313,6 +286,7 @@ impl<'a> TypePass<'a> {
             if let Some(blk) = &i.on_false { st.push(blk); }
           },
           StmtKind::While(w) => { st.push(&w.body); },
+          StmtKind::For(fo) => { st.push(&fo.body); }
           StmtKind::Return(r) => {
             match r {
               Some(e) => { if e.ty.get().kind != TyKind::Void { ret_ty.push(&e.ty) }},
@@ -324,20 +298,11 @@ impl<'a> TypePass<'a> {
         }
       }
     }
-    if ret_ty.is_empty() {
-      Ty::new(TyKind::Void)
-    } else {
-      let mut max_type = &ret_ty.pop().unwrap();
-      for types in &ret_ty {
-        if types.get().assignable_to(max_type.get()) {}
-        else if max_type.get().assignable_to(types.get()) {
-          max_type = types;
-        } else {
-          self.issue(b.loc, BadReturnInBlock)
-        }
-      }
-      max_type.get()
+    for ty in &ret_ty {
+      print!("{:?} ", ty.get());
     }
+    println!("");
+    ret_ty
   }
 
   fn var_sel(&mut self, v: &'a VarSel<'a>, loc: Loc) -> Ty<'a> {
@@ -347,6 +312,7 @@ impl<'a> TypePass<'a> {
     // <not object>.a (e.g.: Class.a, 1.a) / object.method => BadFieldAccess
     // object.field_var, where object's class is not self or any of ancestors => PrivateFieldAccess
 
+    println!("Varsel {} @ {:?}", v.name, loc);
     if let Some(owner) = &v.owner {
       self.cur_used = true;
       let owner = self.expr(owner);
@@ -370,9 +336,8 @@ impl<'a> TypePass<'a> {
     } else {
       // if this stmt is in an VarDef, it cannot access the variable that is being declared
       // TODO: need to check for special access
-//      println!("{} @ {:?}", v.name, loc);
       if let Some(sym) = self.scopes.lookup_before(v.name, loc) {
-//        println!("Potential Conflict {} @ {:?}", v.name, loc);
+        println!("Potential Conflict {} @ {:?}", v.name, loc);
         match sym {
           Symbol::Var(var) => {
             if var.finish_loc < loc {

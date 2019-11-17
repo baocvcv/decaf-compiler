@@ -188,6 +188,7 @@ impl<'a> SymbolPass<'a> {
   }
 
   fn lambda(&mut self, l: &'a Lambda<'a>) {
+    println!("Declaring lambda @ {:?}", l.loc);
     // declare lambda
     self.scopes.declare(Symbol::Lambda(l));
     let ret_ty = Ty::new(TyKind::Error); // dummy
@@ -222,8 +223,18 @@ impl<'a> SymbolPass<'a> {
         for st in &f.body.stmt { s.stmt(st); }
       }),
       StmtKind::Block(b) => self.block(b),
-      StmtKind::ExprEval(e) => { if let ExprKind::Lambda(l) = &e.kind { self.lambda(l) }},
+      StmtKind::Return(r) => { if let Some(e) = &r { self.expr(e); } },
+      StmtKind::ExprEval(e) => { self.expr(e); },
       _ => {}
     };
+  }
+
+  fn expr(&mut self, e: &'a Expr<'a>) {
+    match &e.kind {
+      ExprKind::Lambda(l) => { self.lambda(l); },
+      ExprKind::Unary(u) => { self.expr(u.r.deref()); },
+      ExprKind::Binary(b) => { self.expr(b.l.deref()); self.expr(b.r.deref()); },
+      _ => {}
+    }
   }
 }

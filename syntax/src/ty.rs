@@ -71,6 +71,10 @@ impl<'a> Ty<'a> {
         (Func(rp1), Func(rp2)) => {
           let (r1, p1, r2, p2) = (&rp1[0], &rp1[1..], &rp2[0], &rp2[1..]);
           r1.assignable_to(*r2) && p1.len() == p2.len() && p1.iter().zip(p2.iter()).all(|(p1, p2)| p2.assignable_to(*p1))
+        },
+        (Lambda(rp1), Lambda(rp2)) => {
+          let (r1, p1, r2, p2) = (&rp1[0], &rp1[1..], &rp2[0], &rp2[1..]);
+          r1.assignable_to(*r2) && p1.len() == p2.len() && p1.iter().zip(p2.iter()).all(|(p1, p2)| p2.assignable_to(*p1))
         }
         _ => false,
       }
