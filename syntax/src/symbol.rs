@@ -1,6 +1,7 @@
 use crate::{Block, ClassDef, FuncDef, VarDef, Program, Ty, Lambda, LambdaBody};
 use common::{Loc, HashMap};
 use std::{cell::{RefMut, Ref}, fmt};
+use std::intrinsics::write_bytes;
 
 pub type Scope<'a> = HashMap<&'a str, Symbol<'a>>;
 
@@ -81,10 +82,22 @@ pub enum ScopeOwner<'a> {
     pub fn is_global(&self) -> bool { if let ScopeOwner::Global(_) = self { true } else { false } }
 }
 
+impl fmt::Debug for ScopeOwner<'_> {
+  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+      match self {
+        ScopeOwner::Lambda(l) => write!(f, "Lambda @ {:?}", l.loc),
+        ScopeOwner::Local(b) => write!(f, "Block @ {:?}", b.loc),
+        ScopeOwner::Class(c) => write!(f, "{} @ {:?}", c.name, c.loc),
+        ScopeOwner::Param(func) => write!(f, "{} @ {:?}", func.name, func.loc),
+        ScopeOwner::Global(_) => write!(f, "Global"),
+      }
+  }
+}
+
 impl fmt::Debug for Symbol<'_> {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
     match self {
-      Symbol::Var(v) => write!(f, "{:?} -> variable {}{} : {:?}", v.loc, if v.owner.get().unwrap().is_param() { "@" } else { "" }, v.name, v.ty.get()),
+      Symbol::Var(v) => write!(f, "{:?} -> variable {}{} : {:?}", v.loc, if v.owner.get().unwrap().is_param() || v.owner.get().unwrap().is_lambda() { "@" } else { "" }, v.name, v.ty.get()),
       Symbol::Func(fu) => write!(f, "{:?} -> {}function {} : {:?}", fu.loc, if fu.static_ { "STATIC " } else if fu.abstract_ { "ABSTRACT " } else { "" }, fu.name, Ty::mk_func(fu)),
       Symbol::This(fu) => write!(f, "{:?} -> variable @this : class {}", fu.loc, fu.class.get().unwrap().name),
       Symbol::Class(c) => {

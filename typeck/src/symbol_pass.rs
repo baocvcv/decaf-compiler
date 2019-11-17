@@ -3,6 +3,7 @@ use common::{ErrorKind::*, Ref, MAIN_CLASS, MAIN_METHOD, NO_LOC, HashMap, HashSe
 use syntax::{ast::*, ScopeOwner, Symbol, Ty, TyKind, SynTyKind};
 use std::{ops::{Deref, DerefMut}, iter};
 use hashbrown::hash_map::Entry;
+use std::borrow::Borrow;
 
 pub(crate) struct SymbolPass<'a>(pub TypeCk<'a>);
 
@@ -162,13 +163,18 @@ impl<'a> SymbolPass<'a> {
   }
 
   fn var_def(&mut self, v: &'a VarDef<'a>) {
+//    println!("{}: {:?}", v.name, v.loc);
+//    for scope in self.scopes.stack.iter().rev() {
+//      print!("{:?}  ", scope);
+//    }
+//    println!("");
     v.ty.set(self.ty(&v.syn_ty, false));
     if v.ty.get() == Ty::void() { self.issue(v.loc, VoidVar(v.name)) }
     let ok = if let Some((sym, owner)) = self.scopes.lookup(v.name) {
       match (self.scopes.cur_owner(), owner) {
         (ScopeOwner::Class(c1), ScopeOwner::Class(c2)) if Ref(c1) != Ref(c2) && sym.is_var() =>
           self.issue(v.loc, OverrideVar(v.name)),
-        (ScopeOwner::Class(_), ScopeOwner::Class(_)) | (_, ScopeOwner::Param(_)) | (_, ScopeOwner::Local(_)) =>
+        (ScopeOwner::Class(_), ScopeOwner::Class(_)) | (_, ScopeOwner::Param(_)) | (_, ScopeOwner::Local(_)) | (_, ScopeOwner::Lambda(_)) =>
           self.issue(v.loc, ConflictDeclaration { prev: sym.loc(), name: v.name }),
         _ => true,
       }
@@ -176,21 +182,26 @@ impl<'a> SymbolPass<'a> {
     if ok {
       v.owner.set(Some(self.scopes.cur_owner()));
       self.scopes.declare(Symbol::Var(v));
-      //TODO: add lambda expr to scope
-      if let Some((loc, e)) = &v.init {
-        if let ExprKind::Lambda(f) = &e.kind {
-          let ret_ty = Ty::new(TyKind::Error); // dummy
-          self.scoped(ScopeOwner::Lambda(f), |s| {
-            for v in &f.param { s.var_def(v); }
-            if let Some(b) = &f.body.body { s.block(b); }
-          });
-          for v in &f.param {
-            if v.syn_ty.kind == SynTyKind::Void { self.issue(v.loc, ArgumentCannotBeVoid) }
-          }
-          f.class.set(self.cur_class);
-        }
-      }
     }
+    // add lambda expr to scope
+    if let Some((loc, e)) = &v.init { if let ExprKind::Lambda(f) = &e.kind { self.lambda(f); } }
+  }
+
+  fn lambda(&mut self, l: &'a Lambda<'a>) {
+    // declare lambda
+    self.scopes.declare(Symbol::Lambda(l));
+    let ret_ty = Ty::new(TyKind::Error); // dummy
+    // open new scope for lambda
+    self.scoped(ScopeOwner::Lambda(l), |s| {
+      // check all the params and block stmts
+      for v in &l.param { s.var_def(v); }
+      if let Some(b) = &l.body.body { s.block(b); }
+    });
+    for v in &l.param {
+      // check for void param
+      if v.syn_ty.kind == SynTyKind::Void { self.issue(v.loc, ArgumentCannotBeVoid) }
+    }
+    l.class.set(self.cur_class);
   }
 
   fn block(&mut self, b: &'a Block<'a>) {
@@ -211,6 +222,7 @@ impl<'a> SymbolPass<'a> {
         for st in &f.body.stmt { s.stmt(st); }
       }),
       StmtKind::Block(b) => self.block(b),
+      StmtKind::ExprEval(e) => { if let ExprKind::Lambda(l) = &e.kind { self.lambda(l) }},
       _ => {}
     };
   }

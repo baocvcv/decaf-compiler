@@ -96,6 +96,7 @@ pub struct VarDef<'a> {
   pub init: Option<(Loc, Expr<'a>)>,
   pub ty: Cell<Ty<'a>>,
   pub owner: Cell<Option<ScopeOwner<'a>>>,
+  pub finish_loc: Loc,
 }
 
 impl<'a> VarDef<'a> {
@@ -133,12 +134,14 @@ pub struct Block<'a> {
   pub loc: Loc,
   pub stmt: Vec<Stmt<'a>>,
   pub scope: RefCell<Scope<'a>>,
+  pub ret_ty: Cell<Ty<'a>>,
 }
 
 pub struct If<'a> {
   pub cond: Expr<'a>,
   pub on_true: Block<'a>,
   pub on_false: Option<Block<'a>>,
+  pub ret_ty: Cell<Ty<'a>>,
 }
 
 pub struct While<'a> {

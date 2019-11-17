@@ -5,6 +5,7 @@ use syntax::{ScopeOwner, Symbol, ty::*};
 use std::ops::{Deref, DerefMut};
 use std::iter;
 use std::cell::RefCell;
+use std::borrow::Borrow;
 
 pub(crate) struct TypePass<'a>(pub TypeCk<'a>);
 
@@ -23,7 +24,7 @@ impl<'a> TypePass<'a> {
   }
 
   fn class_def(&mut self, c: &'a ClassDef<'a>) {
-//    println!("Class {}", c.name);
+    println!("Class {}", c.name);
     self.cur_class = Some(c);
     self.scoped(ScopeOwner::Class(c), |s| for f in &c.field {
       if let FieldDef::FuncDef(f) = f {
@@ -37,30 +38,118 @@ impl<'a> TypePass<'a> {
   }
 
   fn block(&mut self, b: &'a Block<'a>) -> bool {
+    //TODO: record the ret type of block
+    println!("In block @ {:?}", b.loc);
     let mut ret = false;
     self.scoped(ScopeOwner::Local(b), |s| for st in &b.stmt { ret = s.stmt(st); });
     ret
+
+//    self.scopes.open(ScopeOwner::Local(b));
+//    for st in &b.stmt {
+//      self.stmt(st);
+//      let ty = match &st.kind {
+//        StmtKind::Return(o) => {
+//          let ty = &o.as_ref().unwrap().ty.get();
+//          println!("Return type is {:?} @ {:?}", ty, st.loc);
+////          if b.ret_ty.get().kind == TyKind::Void { b.ret_ty.set(*ty); }
+////          else if b.ret_ty.get().assignable_to(*ty) { b.ret_ty.set(*ty); }
+////          else if ty.assignable_to(b.ret_ty.get()) {}
+////          else { self.issue(st.loc, BadReturnInBlock) }
+//          o.as_ref().unwrap().ty.get()
+//        },
+//        StmtKind::Block(block) => {
+//          let ty = &block.ret_ty.get();
+//          println!("Return type is {:?} @ {:?}", ty, st.loc);
+////          if block.ret_ty.get().kind == TyKind::Void { block.ret_ty.set(*ty); }
+////          else if block.ret_ty.get().assignable_to(*ty) { block.ret_ty.set(*ty); }
+////          else if ty.assignable_to(block.ret_ty.get()) {}
+////          else { self.issue(b.loc, BadReturnInBlock) }
+//          block.ret_ty.get()
+//        }
+//        StmtKind::If(i) => {
+//          i.ret_ty.set(i.on_true.ret_ty.get());
+//          if let Some(block) = &i.on_false {
+//            if block.ret_ty.get().kind == TyKind::Void {
+//              if i.ret_ty.get().kind == TyKind::Void {}
+//              else { self.issue(b.loc, NoReturn) }
+//            } else if !i.ret_ty.get().assignable_to(block.ret_ty.get()) {
+//              self.issue(b.loc, BadReturnInBlock)
+//            } else {
+//              i.ret_ty.set(block.ret_ty.get());
+//            }
+//          }
+//          i.ret_ty.get()
+//        }
+//        _ => { Ty::new(TyKind::Void) }
+//      };
+//      if b.ret_ty.get().kind == TyKind::Void { b.ret_ty.set(ty); }
+//      else if b.ret_ty.get().assignable_to(ty) { b.ret_ty.set(ty); }
+//      else if ty.assignable_to(b.ret_ty.get()) {}
+//      else { self.issue(b.loc, BadReturnInBlock) }
+//    }
+//    self.scopes.close();
+//    if b.ret_ty.get().kind == TyKind::Void { false }
+//    else { true }
   }
 
   // return whether this stmt has a return value
   fn stmt(&mut self, s: &'a Stmt<'a>) -> bool {
+    println!("Statement @ {:?}", s.loc);
     match &s.kind {
       StmtKind::Assign(a) => {
         let (l, r) = (self.expr(&a.dst), self.expr(&a.src));
         if !r.assignable_to(l) { self.issue(s.loc, IncompatibleBinary { l, op: "=", r }) }
+        // TODO: check for wrong reference
+        if self.lambda_cnt > 0 {
+          if let ExprKind::VarSel(v) = &a.dst.kind {
+//            println!("{}: ", v.name);
+//            for s in &self.scopes.stack {
+//              let name = match s {
+//                ScopeOwner::Global(_) => "Global",
+//                ScopeOwner::Local(_) => "Block",
+//                ScopeOwner::Class(c) => c.name,
+//                ScopeOwner::Param(f) => f.name,
+//                ScopeOwner::Lambda(_) => "lambda",
+//              };
+//              println!("{}", name);
+//            }
+            if let None = v.owner {
+              let mut has_escaped_lambda = false;
+              let mut is_error = false;
+              for scope in self.scopes.stack.iter().rev() {
+                if scope.is_lambda() {
+                  // 1 defined in lambda's parameters
+                  if let Some(t) = scope.scope().get(v.name) { break }
+                  has_escaped_lambda = true;
+                } else if scope.is_local() {
+                  // 2 defined locally
+                  if let Some(t) = scope.scope().get(v.name) {
+                    if t.loc() > a.dst.loc || has_escaped_lambda {
+                      is_error = true;
+                      break
+                    } else { break }
+                  }
+                } else if scope.is_class() {
+                  // defined in class
+                  if let Some(t) = scope.scope().get(v.name) { break }
+                }
+              }
+              if is_error { self.issue(s.loc, NoAssignLambda) }
+            }
+          }
+        }
         false
       }
       StmtKind::LocalVarDef(v) => {
-        self.cur_var_def = Some(v);
+//        println!("Vardef finish loc {:?}", v.finish_loc);
         if let Some((loc, e)) = &v.init {
           let (l, r) = (v.ty.get(), self.expr(e));
           // TODO: how to assign inferred def to var???
           if v.syn_ty.kind == SynTyKind::Var {
-            v.ty.set( self.expr(e).clone());
+            v.ty.set( r.clone());
             if v.ty.get().kind == TyKind::Void { self.issue(v.loc, VoidVar(v.name)) }
           } else if !r.assignable_to(l) { self.issue(*loc, IncompatibleBinary { l, op: "=", r }) }
         }
-        self.cur_var_def = None;
         false
       }
       StmtKind::ExprEval(e) => {
@@ -88,9 +177,11 @@ impl<'a> TypePass<'a> {
         false
       }),
       StmtKind::Return(r) => {
-        let expect = self.cur_func.unwrap().ret_ty();
         let actual = r.as_ref().map(|e| self.expr(e)).unwrap_or(Ty::void());
-        if !actual.assignable_to(expect) { self.issue(s.loc, ReturnMismatch { actual, expect }) }
+        if self.lambda_cnt == 0 {
+          let expect = self.cur_func.unwrap().ret_ty();
+          if !actual.assignable_to(expect) { self.issue(s.loc, ReturnMismatch { actual, expect }) }
+        }
         actual != Ty::void()
       }
       StmtKind::Print(p) => {
@@ -112,6 +203,7 @@ impl<'a> TypePass<'a> {
 
   // e.ty is set to the return value
   fn expr(&mut self, e: &'a Expr<'a>) -> Ty<'a> {
+    println!("Expr @ {:?}", e.loc);
     use ExprKind::*;
     let ty = match &e.kind {
       VarSel(v) => self.var_sel(v, e.loc),
@@ -183,23 +275,69 @@ impl<'a> TypePass<'a> {
       Lambda(l) => {
         // now only inference of ret type is performed here
         // but more could be added
-        let ty = if let Some(b) = &l.body.expr {
-          self.expr(b.deref())
-        } else {
-          match &l.body.body {
-            // inference of ret type for block
-            Some(b) => Ty::new(TyKind::Error),
-            _ => Ty::new(TyKind::Error)
-          }
+        let mut ty = Ty::new(TyKind::Void);
+        if let Some(b) = &l.body.expr {
+          self.scopes.open(ScopeOwner::Lambda(l));
+          ty = self.expr(b.deref());
+          self.scopes.close();
+        } else if let Some(b) = &l.body.body {
+          // deal with lambda body
+          self.lambda_cnt += 1;
+          self.scopes.open(ScopeOwner::Lambda(l));
+          let has_ret = self.block(b);
+          ty = self.dfs_lambda(b);
+          if !has_ret && ty.kind != TyKind::Void { self.issue(b.loc, NoReturn) }
+          self.scopes.close();
+          self.lambda_cnt -= 1;
         };
         let ret_param_ty = iter::once(ty).chain(l.param.iter().map(|v| v.ty.get()));
         let ret_param_ty = self.alloc.ty.alloc_extend(ret_param_ty);
         l.ret_param_ty.set(Some(ret_param_ty));
-        ty
+        Ty::new(TyKind::Lambda(ret_param_ty))
       }
     };
     e.ty.set(ty);
     ty
+  }
+
+  fn dfs_lambda(&mut self, b: &'a Block<'a>) -> Ty<'a> {
+    let mut st = vec![];
+    let mut ret_ty = vec![];
+    st.push(b);
+    while !st.is_empty() {
+      let block = st.pop().unwrap();
+      for stmt in &block.stmt {
+        match &stmt.kind {
+          StmtKind::If(i) => {
+            st.push(&i.on_true);
+            if let Some(blk) = &i.on_false { st.push(blk); }
+          },
+          StmtKind::While(w) => { st.push(&w.body); },
+          StmtKind::Return(r) => {
+            match r {
+              Some(e) => { if e.ty.get().kind != TyKind::Void { ret_ty.push(&e.ty) }},
+              None => {}
+            }
+          },
+          StmtKind::Block(block) => { st.push(&block) },
+          _ => {}
+        }
+      }
+    }
+    if ret_ty.is_empty() {
+      Ty::new(TyKind::Void)
+    } else {
+      let mut max_type = &ret_ty.pop().unwrap();
+      for types in &ret_ty {
+        if types.get().assignable_to(max_type.get()) {}
+        else if max_type.get().assignable_to(types.get()) {
+          max_type = types;
+        } else {
+          self.issue(b.loc, BadReturnInBlock)
+        }
+      }
+      max_type.get()
+    }
   }
 
   fn var_sel(&mut self, v: &'a VarSel<'a>, loc: Loc) -> Ty<'a> {
@@ -232,17 +370,23 @@ impl<'a> TypePass<'a> {
     } else {
       // if this stmt is in an VarDef, it cannot access the variable that is being declared
       // TODO: need to check for special access
-      if let Some(sym) = self.scopes.lookup_before(v.name, self.cur_var_def.map(|v| v.loc).unwrap_or(loc)) {
+//      println!("{} @ {:?}", v.name, loc);
+      if let Some(sym) = self.scopes.lookup_before(v.name, loc) {
+//        println!("Potential Conflict {} @ {:?}", v.name, loc);
         match sym {
           Symbol::Var(var) => {
-            v.var.set(Some(var));
-            if var.owner.get().unwrap().is_class() {
-              let cur = self.cur_func.unwrap();
-              if cur.static_ {
-                self.issue(loc, RefInStatic { field: v.name, func: cur.name })
+            if var.finish_loc < loc {
+              v.var.set(Some(var));
+              if var.owner.get().unwrap().is_class() {
+                let cur = self.cur_func.unwrap();
+                if cur.static_ {
+                  self.issue(loc, RefInStatic { field: v.name, func: cur.name })
+                }
               }
+              var.ty.get()
+            } else {
+              self.issue(loc, UndeclaredVar(v.name))
             }
-            var.ty.get()
           }
           Symbol::Class(c) if self.cur_used => { Ty::mk_class(c) }
           _ => self.issue(loc, UndeclaredVar(v.name)),

@@ -4,8 +4,8 @@ use syntax::{ScopeOwner, Symbol, ClassDef, Program};
 
 pub(crate) struct ScopeStack<'a> {
   // `global` must be ScopeOwner::Global, but we will not depend on this, so just define it as ScopeOwner
-  global: ScopeOwner<'a>,
-  stack: Vec<ScopeOwner<'a>>,
+  pub global: ScopeOwner<'a>,
+  pub stack: Vec<ScopeOwner<'a>>,
 }
 
 impl<'a> ScopeStack<'a> {
@@ -22,8 +22,24 @@ impl<'a> ScopeStack<'a> {
   // do lookup, but will ignore those local symbols whose loc >= the given loc
   pub fn lookup_before(&self, name: &'a str, loc: Loc) -> Option<Symbol<'a>> {
     self.stack.iter().rev().chain(iter::once(&self.global))
-      .filter_map(|&owner| owner.scope().get(name).cloned().filter(|sym| !(owner.is_local() && sym.loc() >= loc)))
+      .filter_map(|&owner| owner.scope().get(name)//.map(|&sym| (sym, owner))
+      .cloned()
+      .filter(|sym| !(sym.loc() >= loc)))
       .next()
+//
+//        Some(t)
+//    } else {
+//      None
+//    };
+//
+//    for owner in self.stack.iter().rev().chain(iter::once(self.global)) {
+//      if let Some(sym) = owner.scope().get(name).cloned() {
+//        if owner.is_local() or sym.loc() >= loc { return None }
+//        else if owner.is_lambda(
+//
+//      }
+//
+//    }
   }
 
   pub fn declare(&mut self, sym: Symbol<'a>) {

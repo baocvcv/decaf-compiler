@@ -74,6 +74,8 @@ pub enum ErrorKind<'a, Ty> {
   CannotBeAbstract(&'a str),
   CannotNewAbstract(&'a str),
   ArgumentCannotBeVoid,
+  NoAssignLambda,
+  BadReturnInBlock,
 }
 
 impl<Ty: fmt::Debug> fmt::Debug for ErrorKind<'_, Ty> {
@@ -118,6 +120,8 @@ impl<Ty: fmt::Debug> fmt::Debug for ErrorKind<'_, Ty> {
       CannotBeAbstract(name) => write!(f, "'{}' is not abstract and does not override all abstract methods", name),
       CannotNewAbstract(name) => write!(f, "cannot instantiate abstract class '{}'", name),
       ArgumentCannotBeVoid => write!(f, "arguments in function type must be non-void known type"),
+      NoAssignLambda => write!(f, "cannot assign value to captured variables in lambda expression"),
+      BadReturnInBlock => write!(f, "incompatible return types in blocked expression"),
     }
   }
 }

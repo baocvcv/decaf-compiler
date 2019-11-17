@@ -29,7 +29,7 @@ pub(crate) fn mk_int_lit<'a, T>(loc: Loc, s: &'a str, error: &mut Errors<'a, T>)
 
 // make a block from a single statement(which may already be a block)
 fn mk_block(s: Stmt) -> Block {
-  if let StmtKind::Block(b) = s.kind { b } else { Block { loc: s.loc, stmt: vec![s], scope: dft() } }
+  if let StmtKind::Block(b) = s.kind { b } else { Block { loc: s.loc, stmt: vec![s], scope: dft(), ret_ty: dft() } }
 }
 
 pub(crate) trait VecExt: Sized {

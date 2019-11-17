@@ -15,7 +15,7 @@ pub struct TypeCkAlloc<'a> {
 }
 
 pub fn work<'a>(p: &'a Program<'a>, alloc: &'a TypeCkAlloc<'a>) -> Result<(), Errors<'a, Ty<'a>>> {
-  let mut s = SymbolPass(TypeCk { errors: Errors(vec![]), scopes: ScopeStack::new(p), loop_cnt: 0, cur_used: false, cur_func: None, cur_class: None, cur_var_def: None, alloc });
+  let mut s = SymbolPass(TypeCk { errors: Errors(vec![]), scopes: ScopeStack::new(p), loop_cnt: 0, cur_used: false, cur_func: None, cur_class: None, alloc, lambda_cnt: 0 });
   s.program(p);
   if !s.errors.0.is_empty() { return Err(s.0.errors.sorted()); }
   let mut t = TypePass(s.0);
@@ -36,8 +36,10 @@ struct TypeCk<'a> {
   // actually only use cur_var_def's loc
   // if cur_var_def is Some, will use it's loc to search for symbol in TypePass::var_sel
   // this can reject code like `int a = a;`
-  cur_var_def: Option<&'a VarDef<'a>>,
+//  cur_var_def: Option<&'a VarDef<'a>>,
   alloc: &'a TypeCkAlloc<'a>,
+  // is in lambda
+  lambda_cnt: u32,
 }
 
 impl<'a> TypeCk<'a> {

@@ -168,7 +168,7 @@ impl<'p> Parser<'p> {
   // the `VarDef` in grammar only supports VarDef without init value
   #[rule(VarDef -> Type Id)]
   fn var_def(&self, syn_ty: SynTy<'p>, name: Token) -> &'p VarDef<'p> {
-    self.alloc.var.alloc(VarDef { loc: name.loc(), name: name.str(), syn_ty, init: None, ty: dft(), owner: dft() })
+    self.alloc.var.alloc(VarDef { loc: name.loc(), name: name.str(), syn_ty, init: None, ty: dft(), owner: dft(), finish_loc: Loc(lexer.line, lexer.col) })
   }
 
   #[rule(VarDefListOrEmpty -> VarDefList)]
@@ -182,7 +182,7 @@ impl<'p> Parser<'p> {
   fn var_def_list1(v: &'p VarDef<'p>) -> Vec<&'p VarDef<'p>> { vec![v] }
 
   #[rule(Block -> LBrc StmtList RBrc)]
-  fn block(l: Token, stmt: Vec<Stmt<'p>>, _r: Token) -> Block<'p> { Block { loc: l.loc(), stmt, scope: dft() } }
+  fn block(l: Token, stmt: Vec<Stmt<'p>>, _r: Token) -> Block<'p> { Block { loc: l.loc(), stmt, scope: dft(), ret_ty: dft() } }
 
   #[rule(StmtList -> StmtList Stmt)]
   fn stmt_list(l: Vec<Stmt<'p>>, r: Stmt<'p>) -> Vec<Stmt<'p>> { l.pushed(r) }
@@ -193,7 +193,7 @@ impl<'p> Parser<'p> {
   fn stmt_simple(s: Stmt<'p>, _s: Token) -> Stmt<'p> { s }
   #[rule(Stmt -> If LPar Expr RPar Stmt MaybeElse)]
   fn stmt_if(i: Token, _l: Token, cond: Expr<'p>, _r: Token, on_true: Stmt<'p>, on_false: Option<Block<'p>>) -> Stmt<'p> {
-    mk_stmt(i.loc(), Box::new(If { cond, on_true: mk_block(on_true), on_false }).into())
+    mk_stmt(i.loc(), Box::new(If { cond, on_true: mk_block(on_true), on_false, ret_ty: dft() }).into())
   }
   #[rule(Stmt -> While LPar Expr RPar Stmt)]
   fn stmt_while(w: Token, _l: Token, cond: Expr<'p>, _r: Token, body: Stmt<'p>) -> Stmt<'p> {
@@ -227,12 +227,12 @@ impl<'p> Parser<'p> {
   #[rule(Simple -> Type Id Assign Expr)] // the VarDef with init
   fn simple_var_def_init(&self, syn_ty: SynTy<'p>, name: Token, a: Token, init: Expr<'p>) -> Stmt<'p> {
     let loc = name.loc();
-    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty, init: Some((a.loc(), init)), ty: dft(), owner: dft() })).into())
+    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty, init: Some((a.loc(), init)), ty: dft(), owner: dft(), finish_loc: Loc(lexer.line, lexer.col) })).into())
   }
   #[rule(Simple -> Var Id Assign Expr)]
   fn simple_auto_var_def(&self, v: Token, name: Token, a: Token, init: Expr<'p>) -> Stmt<'p> {
     let loc = name.loc();
-    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty: SynTy { loc: v.loc(), arr: 0, kind: SynTyKind::Var, rt: None, tl: vec![] }, init: Some((a.loc(), init)), ty: dft(), owner: dft() })).into())
+    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty: SynTy { loc: v.loc(), arr: 0, kind: SynTyKind::Var, rt: None, tl: vec![] }, init: Some((a.loc(), init)), ty: dft(), owner: dft(), finish_loc: Loc(lexer.line, lexer.col) })).into())
   }
   #[rule(Simple -> Expr)]
   fn simple_mk_expr(e: Expr<'p>) -> Stmt<'p> { mk_stmt(e.loc, e.into()) }
