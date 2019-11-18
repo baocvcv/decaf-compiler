@@ -49,11 +49,9 @@ pub fn block(b: &Block, p: &mut IndentPrinter) {
         StmtKind::While(w) => block(&w.body, p),
         StmtKind::For(f) => block(&f.body, p),
         StmtKind::Block(b) => block(b, p),
-        StmtKind::LocalVarDef(v) => {
-          if let Some((l, e)) = &v.init {
-            if let ExprKind::Lambda(l) = &e.kind { lambda(l, p); }
-          }
-        }
+        StmtKind::LocalVarDef(v) => { if let Some((l, e)) = &v.init { if let ExprKind::Lambda(l) = &e.kind { lambda(l, p); } } }
+        StmtKind::Assign(a) => { if let ExprKind::Lambda(l) = &a.src.kind { lambda(l, p); }}
+        StmtKind::ExprEval(e) => expr(e, p),
         _ => {}
       }
     }
@@ -65,5 +63,21 @@ pub fn lambda(l: &Lambda, p: &mut IndentPrinter) {
   p.indent(|p| {
     show_scope(&l.scope.borrow(), p);
     if let Some(b) = &l.body.body { block(b, p); }
+    else if let Some(e) = &l.body.expr {
+      write!(p, "LOCAL SCOPE:").ignore();
+      p.indent(|pp| { show_scope(&e.scope.borrow(), pp); } );
+    }
   });
+}
+
+pub fn expr(e: &Expr, p: &mut IndentPrinter) {
+  match &e.kind {
+    ExprKind::Lambda(l) => { lambda(l, p); },
+    ExprKind::Unary(u) => { expr(u.r.borrow(), p); },
+    ExprKind::Binary(b) => {
+      expr(b.l.borrow(), p);
+      expr(b.r.borrow(), p);
+    },
+    _ => {}
+  }
 }

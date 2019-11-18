@@ -1,4 +1,4 @@
-use crate::{Block, ClassDef, FuncDef, VarDef, Program, Ty, Lambda, LambdaBody};
+use crate::{Block, ClassDef, FuncDef, VarDef, Program, Ty, Lambda, LambdaBody, Expr};
 use common::{Loc, HashMap};
 use std::{cell::{RefMut, Ref}, fmt};
 use std::intrinsics::write_bytes;
@@ -21,7 +21,7 @@ impl<'a> Symbol<'a> {
       Symbol::Func(f) => f.name,
       Symbol::This(_) => "this",
       Symbol::Class(c) => c.name,
-      Symbol::Lambda(_) => "lambda",
+      Symbol::Lambda(l) => l.name.as_str(),
     }
   }
 
@@ -56,6 +56,7 @@ impl<'a> Symbol<'a> {
 #[derive(Copy, Clone)]
 pub enum ScopeOwner<'a> {
   // TODO: think about this
+    ExprLocal(&'a Expr<'a>),
     Lambda(&'a Lambda<'a>),
     Local(&'a Block<'a>),
     Param(&'a FuncDef<'a>),
@@ -67,12 +68,12 @@ pub enum ScopeOwner<'a> {
     // boilerplate code...
     pub fn scope(&self) -> Ref<'a, Scope<'a>> {
       use ScopeOwner::*;
-      match self { Lambda(x) => x.scope.borrow(), Local(x) => x.scope.borrow(), Param(x) => x.scope.borrow(), Class(x) => x.scope.borrow(), Global(x) => x.scope.borrow(), }
+      match self { Lambda(x) => x.scope.borrow(), Local(x) => x.scope.borrow(), Param(x) => x.scope.borrow(), Class(x) => x.scope.borrow(), Global(x) => x.scope.borrow(), ExprLocal(x) => x.scope.borrow()}
     }
 
     pub fn scope_mut(&self) -> RefMut<'a, Scope<'a>> {
       use ScopeOwner::*;
-      match self { Lambda(x) => x.scope.borrow_mut(), Local(x) => x.scope.borrow_mut(), Param(x) => x.scope.borrow_mut(), Class(x) => x.scope.borrow_mut(), Global(x) => x.scope.borrow_mut(), }
+      match self { Lambda(x) => x.scope.borrow_mut(), Local(x) => x.scope.borrow_mut(), Param(x) => x.scope.borrow_mut(), Class(x) => x.scope.borrow_mut(), Global(x) => x.scope.borrow_mut(), ExprLocal(x) => x.scope.borrow_mut(),}
     }
 
     pub fn is_lambda(&self) -> bool { if let ScopeOwner::Lambda(_) = self { true } else { false } }
@@ -80,6 +81,7 @@ pub enum ScopeOwner<'a> {
     pub fn is_param(&self) -> bool { if let ScopeOwner::Param(_) = self { true } else { false } }
     pub fn is_class(&self) -> bool { if let ScopeOwner::Class(_) = self { true } else { false } }
     pub fn is_global(&self) -> bool { if let ScopeOwner::Global(_) = self { true } else { false } }
+    pub fn is_expr(&self) -> bool { if let ScopeOwner::ExprLocal(_) = self { true } else { false } }
 }
 
 impl fmt::Debug for ScopeOwner<'_> {
@@ -90,6 +92,7 @@ impl fmt::Debug for ScopeOwner<'_> {
         ScopeOwner::Class(c) => write!(f, "{} @ {:?}", c.name, c.loc),
         ScopeOwner::Param(func) => write!(f, "{} @ {:?}", func.name, func.loc),
         ScopeOwner::Global(_) => write!(f, "Global"),
+        ScopeOwner::ExprLocal(e) => write!(f, "Block @ {:?}", e.loc),
       }
   }
 }

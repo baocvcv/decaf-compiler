@@ -38,6 +38,7 @@ pub enum TyKind<'a> {
   // [0] = ret, [1..] = param
   Func(&'a [Ty<'a>]),
   Lambda(&'a [Ty<'a>]),
+  Length(&'a [Ty<'a>]),
 }
 
 impl Default for TyKind<'_> {
@@ -68,14 +69,10 @@ impl<'a> Ty<'a> {
         (Int, Int) | (Bool, Bool) | (String, String) | (Void, Void) => true,
         (Object(c1), Object(Ref(c2))) => c1.extends(c2),
         (Null, Object(_)) => true,
-        (Func(rp1), Func(rp2)) => {
+        (Func(rp1), Func(rp2)) | (Func(rp1), Lambda(rp2)) | (Lambda(rp1), Func(rp2)) | (Lambda(rp1), Lambda(rp2)) => {
           let (r1, p1, r2, p2) = (&rp1[0], &rp1[1..], &rp2[0], &rp2[1..]);
           r1.assignable_to(*r2) && p1.len() == p2.len() && p1.iter().zip(p2.iter()).all(|(p1, p2)| p2.assignable_to(*p1))
         },
-        (Lambda(rp1), Lambda(rp2)) => {
-          let (r1, p1, r2, p2) = (&rp1[0], &rp1[1..], &rp2[0], &rp2[1..]);
-          r1.assignable_to(*r2) && p1.len() == p2.len() && p1.iter().zip(p2.iter()).all(|(p1, p2)| p2.assignable_to(*p1))
-        }
         _ => false,
       }
     }
@@ -115,7 +112,7 @@ impl fmt::Debug for Ty<'_> {
       // the printing format may be different from other experiment framework's
       // it is not because their format is hard to implement in rust, but because I simply don't like their format,
       // which introduces unnecessary complexity, and doesn't increase readability
-      TyKind::Func(ret_param) | TyKind::Lambda(ret_param) => {
+      TyKind::Func(ret_param) | TyKind::Lambda(ret_param) | TyKind::Length(ret_param) => {
         let (ret, param) = (ret_param[0], &ret_param[1..]);
         write!(f, "{:?}(", ret)?;
         for (idx, p) in param.iter().enumerate() {

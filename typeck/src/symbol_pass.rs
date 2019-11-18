@@ -1,6 +1,6 @@
 use crate::{TypeCk, TypeCkTrait};
 use common::{ErrorKind::*, Ref, MAIN_CLASS, MAIN_METHOD, NO_LOC, HashMap, HashSet};
-use syntax::{ast::*, ScopeOwner, Symbol, Ty, TyKind, SynTyKind};
+use syntax::{ast::*, ScopeOwner, Symbol, Ty, TyKind, SynTyKind, SynTy};
 use std::{ops::{Deref, DerefMut}, iter};
 use hashbrown::hash_map::Entry;
 use std::borrow::Borrow;
@@ -125,6 +125,7 @@ impl<'a> SymbolPass<'a> {
   }
 
   fn func_def(&mut self, f: &'a FuncDef<'a>) {
+    // TODO: jaewoifjwoifego;sf
     let ret_ty = self.ty(&f.ret, false);
     self.scoped(ScopeOwner::Param(f), |s| {
       if !f.static_ { s.scopes.declare(Symbol::This(f)); }
@@ -168,6 +169,12 @@ impl<'a> SymbolPass<'a> {
 //      print!("{:?}  ", scope);
 //    }
 //    println!("");
+//    if v.syn_ty.kind == SynTyKind::Lambda {
+//      let ty = TyKind::Lambda(self.parse_lambda_type(&v.syn_ty));
+//      v.ty.set(Ty { arr: v.syn_ty.arr, kind: ty });
+//    } else {
+//      v.ty.set(self.ty(&v.syn_ty, false));
+//    }
     v.ty.set(self.ty(&v.syn_ty, false));
     if v.ty.get() == Ty::void() { self.issue(v.loc, VoidVar(v.name)) }
     let ok = if let Some((sym, owner)) = self.scopes.lookup(v.name) {
@@ -197,6 +204,11 @@ impl<'a> SymbolPass<'a> {
       // check all the params and block stmts
       for v in &l.param { s.var_def(v); }
       if let Some(b) = &l.body.body { s.block(b); }
+      else if let Some(e) = &l.body.expr {
+        s.scopes.open(ScopeOwner::ExprLocal(e));
+        s.expr(e);
+        s.scopes.close();
+      }
     });
     for v in &l.param {
       // check for void param
@@ -211,6 +223,7 @@ impl<'a> SymbolPass<'a> {
 
   fn stmt(&mut self, s: &'a Stmt<'a>) {
     match &s.kind {
+      StmtKind::Assign(a) => self.expr(&a.src),
       StmtKind::LocalVarDef(v) => self.var_def(v),
       StmtKind::If(i) => {
         self.block(&i.on_true);

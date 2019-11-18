@@ -243,7 +243,7 @@ impl<'p> Parser<'p> {
   fn expr_lvalue(l: Expr<'p>) -> Expr<'p> { l }
   #[rule(Expr -> Expr LPar ExprListOrEmpty RPar)]
   fn expr_call(func: Expr<'p>, l: Token, arg: Vec<Expr<'p>>, _r: Token) -> Expr<'p> {
-    mk_expr(l.loc(), Call { func: Box::new(func), arg, func_ref: dft() }.into())
+    mk_expr(l.loc(), Call { func: Box::new(func), arg, func_ref: dft(), lambda_ref: dft() }.into())
   }
   #[rule(Expr -> IntLit)]
   fn expr_int(&mut self, i: Token) -> Expr<'p> { mk_int_lit(i.loc(), i.str(), &mut self.error) }
@@ -321,11 +321,11 @@ impl<'p> Parser<'p> {
   }
   #[rule(Expr -> Func LPar VarDefListOrEmpty RPar To Expr)]
   fn expr_lambda1(f: Token, _lp: Token, pa: Vec<&'p VarDef<'p>>, _rp: Token, _t: Token, e: Expr<'p>) -> Expr<'p> {
-    mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, body: LambdaBody { expr: Some(Box::new(e)), body: None }, ret_param_ty: dft(), class: dft(), scope: dft() }.into())
+    mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, name: format!("lambda@{:?}", f.loc()), body: LambdaBody { expr: Some(Box::new(e)), body: None }, ret_param_ty: dft(), class: dft(), scope: dft() }.into())
   }
   #[rule(Expr -> Func LPar VarDefListOrEmpty RPar Block)]
   fn expr_lambda0(f: Token, _lp: Token, pa: Vec<&'p VarDef<'p>>, _rp: Token, b: Block<'p>) -> Expr<'p> {
-    mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, body: LambdaBody { expr: None, body: Some(b) }, ret_param_ty: dft(), class: dft(), scope: dft() }.into())
+    mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, name: format!("lambda@{:?}", f.loc()), body: LambdaBody { expr: None, body: Some(b) }, ret_param_ty: dft(), class: dft(), scope: dft() }.into())
   }
 
   #[rule(ExprList -> ExprList Comma Expr)]
@@ -345,7 +345,7 @@ impl<'p> Parser<'p> {
 
   #[rule(VarSel -> MaybeOwner Id)]
   fn var_sel(owner: Option<Box<Expr<'p>>>, name: Token) -> Expr<'p> {
-    mk_expr(name.loc(), VarSel { owner, name: name.str(), var: dft() }.into())
+    mk_expr(name.loc(), VarSel { owner, name: name.str(), var: dft(), func: dft(), lambda: dft() }.into())
   }
 
   #[rule(LValue -> VarSel)]

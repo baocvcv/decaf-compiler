@@ -6,6 +6,7 @@ use common::{Errors, ErrorKind::*, Ref};
 use syntax::{FuncDef, ClassDef, SynTy, SynTyKind, ScopeOwner, Ty, TyKind, Program, VarDef};
 use typed_arena::Arena;
 use std::ops::{Deref, DerefMut};
+use std::iter;
 use crate::{symbol_pass::SymbolPass, type_pass::TypePass, scope_stack::ScopeStack};
 
 // if you want to alloc other types, you can add them to TypeCkAlloc
@@ -44,7 +45,7 @@ struct TypeCk<'a> {
 
 impl<'a> TypeCk<'a> {
   // is_arr can be helpful if you want the type of array while only having its element type (to avoid cloning other fields)
-  fn ty(&mut self, s: &SynTy<'a>, is_arr: bool) -> Ty<'a> {
+  fn ty(&mut self, s: &'a SynTy<'a>, is_arr: bool) -> Ty<'a> {
     let kind = match &s.kind {
       SynTyKind::Int => TyKind::Int,
       SynTyKind::Bool => TyKind::Bool,
@@ -54,7 +55,7 @@ impl<'a> TypeCk<'a> {
         TyKind::Object(Ref(c))
       } else { self.issue(s.loc, NoSuchClass(name)) },
       // TODO: update this
-      SynTyKind::Lambda => TyKind::Error, // only temporary
+      SynTyKind::Lambda => { TyKind::Lambda(self.parse_lambda_type(s)) }, // only temporary
       SynTyKind::Var => TyKind::Error,
     };
     match kind {
@@ -62,6 +63,20 @@ impl<'a> TypeCk<'a> {
       TyKind::Void if s.arr != 0 => self.issue(s.loc, VoidArrayElement),
       _ => Ty { arr: s.arr + (is_arr as u32), kind }
     }
+  }
+
+  fn parse_lambda_type(&mut self, ty: &'a SynTy<'a>) -> &'a mut [Ty<'a>] {
+    let mut params = vec![];
+    // parse return type
+    if ty.rt.as_ref().unwrap().deref().kind == SynTyKind::Lambda { params.push(self.ty(ty.rt.as_ref().unwrap().deref(), false)); }
+    else { params.push(self.ty(ty.rt.as_ref().unwrap().deref(), false)); }
+    // parse params
+    for st in &ty.tl {
+      if st.kind == SynTyKind::Void { self.issue(st.loc, ArgumentCannotBeVoid) }
+      if st.kind == SynTyKind::Lambda { params.push(self.ty(st, false)); }
+      else { params.push(self.ty(st, false)); }
+    }
+    self.alloc.ty.alloc_extend(params)
   }
 }
 

@@ -160,6 +160,7 @@ pub struct Expr<'a> {
   pub loc: Loc,
   pub ty: Cell<Ty<'a>>,
   pub kind: ExprKind<'a>,
+  pub scope: RefCell<Scope<'a>>,
 }
 
 #[derive(derive_more::From)]
@@ -187,6 +188,8 @@ pub struct VarSel<'a> {
   pub owner: Option<Box<Expr<'a>>>,
   pub name: &'a str,
   pub var: Cell<Option<&'a VarDef<'a>>>,
+  pub func: Cell<Option<&'a FuncDef<'a>>>,
+  pub lambda: Cell<Option<&'a Lambda<'a>>>,
 }
 
 pub struct IndexSel<'a> {
@@ -199,7 +202,9 @@ pub struct Call<'a> {
   // hint: there are 2 places using `func` as VarSel, and there are 2 unimplemented!() respectively
   pub func: Box<Expr<'a>>,
   pub arg: Vec<Expr<'a>>,
+  //TODO: may need to change
   pub func_ref: Cell<Option<&'a FuncDef<'a>>>,
+  pub lambda_ref: Cell<Option<&'a Lambda<'a>>>,
 }
 
 pub struct Binary<'a> {
@@ -239,6 +244,7 @@ pub struct Lambda<'a> {
   pub loc: Loc,
   pub param: Vec<&'a VarDef<'a>>,
   pub body: LambdaBody<'a>,
+  pub name: String,
   // Same as FuncDef
   pub ret_param_ty: Cell<Option<&'a [Ty<'a>]>>,
   pub class: Cell<Option<&'a ClassDef<'a>>>,

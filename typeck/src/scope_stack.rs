@@ -67,6 +67,7 @@ impl<'a> ScopeStack<'a> {
   pub fn cur_owner(&self) -> ScopeOwner<'a> {
     *self.stack.last().unwrap_or(&self.global)
   }
+Varsel (no owner) clearArray @ (20,15)
 
   pub fn lookup_class(&self, name: &'a str) -> Option<&'a ClassDef<'a>> {
     self.global.scope().get(name).map(|class| match class {

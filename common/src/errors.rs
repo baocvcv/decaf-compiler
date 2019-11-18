@@ -76,6 +76,9 @@ pub enum ErrorKind<'a, Ty> {
   ArgumentCannotBeVoid,
   NoAssignLambda,
   BadReturnInBlock,
+  NotCallable { var: Ty },
+  LambdaArgcMismatch { expect: u32, actual: u32 },
+  NoAssignMemberMethod(&'a str),
 }
 
 impl<Ty: fmt::Debug> fmt::Debug for ErrorKind<'_, Ty> {
@@ -122,6 +125,10 @@ impl<Ty: fmt::Debug> fmt::Debug for ErrorKind<'_, Ty> {
       ArgumentCannotBeVoid => write!(f, "arguments in function type must be non-void known type"),
       NoAssignLambda => write!(f, "cannot assign value to captured variables in lambda expression"),
       BadReturnInBlock => write!(f, "incompatible return types in blocked expression"),
+      NotCallable { var} => write!(f, "{:?} is not a callable type", var),
+      LambdaArgcMismatch {expect, actual } => write!(f, "lambda expression expects {} argument(s) but {} given", expect, actual),
+      NoAssignMemberMethod(name) => write!(f, "cannot assign value to class member method '{}'", name),
+
     }
   }
 }
