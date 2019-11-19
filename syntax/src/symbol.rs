@@ -1,7 +1,6 @@
-use crate::{Block, ClassDef, FuncDef, VarDef, Program, Ty, Lambda, LambdaBody, Expr};
+use crate::{Block, ClassDef, FuncDef, VarDef, Program, Ty, Lambda, Expr};
 use common::{Loc, HashMap};
 use std::{cell::{RefMut, Ref}, fmt};
-use std::intrinsics::write_bytes;
 
 pub type Scope<'a> = HashMap<&'a str, Symbol<'a>>;
 

@@ -61,7 +61,7 @@ pub fn block(b: &Block, p: &mut IndentPrinter) {
 }
 
 pub fn lambda(l: &Lambda, p: &mut IndentPrinter) {
-  write!(p, "FORMAL SCOPE OF 'lambda@{:?}':", l.loc);
+  write!(p, "FORMAL SCOPE OF 'lambda@{:?}':", l.loc).ignore();
   p.indent(|p| {
     show_scope(&l.scope.borrow(), p);
     if let Some(b) = &l.body.body { block(b, p); }

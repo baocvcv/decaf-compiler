@@ -22,7 +22,6 @@ impl<'a> TypePass<'a> {
   }
 
   fn class_def(&mut self, c: &'a ClassDef<'a>) {
-//    println!("Class {}", c.name);
     self.cur_class = Some(c);
     self.scoped(ScopeOwner::Class(c), |s| for f in &c.field {
       if let FieldDef::FuncDef(f) = f {
@@ -36,7 +35,6 @@ impl<'a> TypePass<'a> {
   }
 
   fn block(&mut self, b: &'a Block<'a>) -> bool {
-//    println!("In block @ {:?}", b.loc);
     let mut ret = false;
     self.scoped(ScopeOwner::Local(b), |s| for st in &b.stmt { ret = s.stmt(st); });
     ret
@@ -44,24 +42,12 @@ impl<'a> TypePass<'a> {
 
   // return whether this stmt has a return value
   fn stmt(&mut self, s: &'a Stmt<'a>) -> bool {
-//    println!("Statement @ {:?}", s.loc);
     match &s.kind {
       StmtKind::Assign(a) => {
         let (l, r) = (self.expr(&a.dst), self.expr(&a.src));
         if !r.assignable_to(l) { self.issue(s.loc, IncompatibleBinary { l, op: "=", r }) }
         if self.lambda_cnt > 0 {
           if let ExprKind::VarSel(v) = &a.dst.kind {
-//            println!("{}: ", v.name);
-//            for s in &self.scopes.stack {
-//              let name = match s {
-//                ScopeOwner::Global(_) => "Global",
-//                ScopeOwner::Local(_) => "Block",
-//                ScopeOwner::Class(c) => c.name,
-//                ScopeOwner::Param(f) => f.name,
-//                ScopeOwner::Lambda(_) => "lambda",
-//              };
-//              println!("{}", name);
-//            }
             if let None = v.owner {
               let mut has_escaped_lambda = false;
               let mut is_error = false;
@@ -96,7 +82,6 @@ impl<'a> TypePass<'a> {
         false
       }
       StmtKind::LocalVarDef(v) => {
-//        println!("Vardef finish loc {:?}", v.finish_loc);
         if let Some((loc, e)) = &v.init {
           let (l, r) = (v.ty.get(), self.expr(e));
           // TODO: how to assign inferred def to var???
@@ -158,7 +143,6 @@ impl<'a> TypePass<'a> {
 
   // e.ty is set to the return value
   fn expr(&mut self, e: &'a Expr<'a>) -> Ty<'a> {
-//    println!("Expr @ {:?}", e.loc);
     use ExprKind::*;
     let ty = match &e.kind {
       VarSel(v) => self.var_sel(v, e.loc),
@@ -226,13 +210,11 @@ impl<'a> TypePass<'a> {
           Ty::mk_obj(cl)
         } else { self.issue(e.loc, NoSuchClass(c.name)) }
       }
-      // TODO: add lambda
       Lambda(l) => {
         // now only inference of ret type is performed here
         // but more could be added
         let mut ty = Ty::new(TyKind::Void);
         if let Some(b) = &l.body.expr {
-//          println!("Parsing lambda expr @ {:?}", b.loc);
           self.lambda_cnt += 1;
           self.scopes.open(ScopeOwner::Lambda(l));
           ty = self.expr(b.deref());
@@ -240,24 +222,17 @@ impl<'a> TypePass<'a> {
           self.lambda_cnt -= 1;
         } else if let Some(b) = &l.body.body {
           // deal with lambda body
-//          println!("Parsing lambda block @{:?}", b.loc);
           self.lambda_cnt += 1;
           self.scopes.open(ScopeOwner::Lambda(l));
           let have_ret = self.block(b);
           self.scopes.close();
           self.lambda_cnt -= 1;
-//          if have_ret { println!("Have ret"); } else { println!("have no ret"); }
 
-//          let (have_conflict, ret_ty) = self.dfs_lambda(b);
-//          println!("Max return: {:?}", ret_ty);
-//          if !have_ret && ret_ty != Ty::void() { self.issue(b.loc, NoReturn) }
-//          if have_conflict { self.issue(b.loc, BadReturnInBlock) }
-//          ty = self.get_block_ret(b);
+          // parse return stmts
           let (have_conflict, ret_ty) = self.dfs_lambda(b);
           if !have_ret && *ret_ty != Ty::void() { self.issue(b.loc, NoReturn) }
           if have_conflict { self.issue(b.loc, BadReturnInBlock) }
           ty = *ret_ty;
-//          println!("     Ret: {:?}", ret_ty);
         };
         let ret_param_ty = iter::once(ty).chain(l.param.iter().map(|v| v.ty.get()));
         let ret_param_ty = self.alloc.ty.alloc_extend(ret_param_ty);
@@ -318,15 +293,10 @@ impl<'a> TypePass<'a> {
     else {
       match (&t1.kind, &t2.kind) {
         (TyKind::Object(c1), TyKind::Object(c2)) | (TyKind::Object(c1), TyKind::Class(c2)) | (TyKind::Class(c1), TyKind::Class(c2)) | (TyKind::Class(c1), TyKind::Object(c2)) => {
-//          println!("Inspecting {} {}", c1.name, c2.name);
           if c1.extends(c2) { return (false, Box::new(*t2)); }
           else if c2.extends(c1) { return (false, Box::new(*t1)); }
           let mut cc = c1.parent_ref.get();
           loop {
-//      while let Some(p2) = class2.parent_ref.get() {
-//        if p1.loc == p2.loc && p1.name == p2.name { return class1.parent_ref.get(); }
-//        class2 = p2;
-//      }
             if let Some(class) = cc {
               if c2.extends(cc.unwrap()) { return (false, Box::new(Ty::mk_class(class))); }
               cc = cc.unwrap().parent_ref.get();
@@ -357,34 +327,11 @@ impl<'a> TypePass<'a> {
     }
   }
 
-//  fn get_least_common_ancestor(&mut self, c1: &ClassDef<'a>, c2: &ClassDef<'a>) -> Option<&'b ClassDef<'a>> {
-//    println!("Inspecting {} {}", c1.name, c2.name);
-//    if c1.extends(c2) { return Some(c2); }
-//    else if c2.extends(c1) { return Some(c1); }
-//
-//    let mut cc = c1.parent_ref.get();
-//    loop {
-////      while let Some(p2) = class2.parent_ref.get() {
-////        if p1.loc == p2.loc && p1.name == p2.name { return class1.parent_ref.get(); }
-////        class2 = p2;
-////      }
-//      if let Some(class) = cc {
-//        if c2.extends(cc.unwrap()) { return cc; }
-//        cc = cc.unwrap().parent_ref.get();
-//      } else { break }
-//    }
-//    cc
-//  }
-
   fn get_min_type(&mut self, t1: &Ty<'a>, t2: &Ty<'a>) -> (bool, Box<Ty<'a>>) {
     if t1.assignable_to(*t2) { return (false, Box::new(*t1)); }
     else if t2.assignable_to(*t1) { return (false, Box::new(*t2)); }
     else {
       match (&t1.kind, &t2.kind) {
-//        (TyKind::Object(c1), TyKind::Object(c2)) | (TyKind::Object(c1), TyKind::Class(c2)) | (TyKind::Class(c1), TyKind::Class(c2)) | (TyKind::Class(c1), TyKind::Object(c2)) => {
-//          if let Some(c) = self.get_least_common_ancestor(c1, c2) { return (false, Box::new(Ty::mk_class(c))); }
-//          else { return (true, Box::new(*t1)); }
-//        }
         (TyKind::Func(f1), TyKind::Func(f2)) |(TyKind::Func(f1), TyKind::Lambda(f2)) |(TyKind::Lambda(f1), TyKind::Lambda(f2)) |(TyKind::Lambda(f1), TyKind::Func(f2)) |(TyKind::Length(f1), TyKind::Func(f2))|(TyKind::Lambda(f1), TyKind::Length(f2))|(TyKind::Length(f1), TyKind::Lambda(f2))|(TyKind::Func(f1), TyKind::Length(f2))|(TyKind::Length(f1), TyKind::Length(f2))=> {
           let (r1, p1, r2, p2) = (&f1[0], &f1[1..], &f2[0], &f2[1..]);
           let (hc, r) = self.get_min_type(r1, r2);
@@ -408,116 +355,6 @@ impl<'a> TypePass<'a> {
     }
   }
 
-  fn block_has_ret(&mut self, b: &'a Block<'a>) -> (bool, Ty<'a>) {
-    let mut ret_ty = vec![];
-    for stmt in &b.stmt {
-      match &stmt.kind {
-        StmtKind::If(i) => {
-          let (hc, ret) = self.block_has_ret(&i.on_true);
-          if hc { return (true, Ty::void()); }
-          ret_ty.push(ret);
-          if let Some(blk) = &i.on_false {
-            let (hc, ret) = self.block_has_ret(blk);
-            if hc { return (true, Ty::void()); }
-            ret_ty.push(ret);
-          }
-        },
-        StmtKind::While(w) => {
-          let (hc, ret) =  self.block_has_ret(&w.body);
-          if hc { return (true, Ty::void()); }
-          ret_ty.push(ret);
-        },
-        StmtKind::For(fo) => {
-          let (hc, ret) =  self.block_has_ret(&fo.body);
-          if hc { return (true, Ty::void()); }
-          ret_ty.push(ret);
-        }
-        StmtKind::Return(r) => {
-          match r {
-            Some(e) => { ret_ty.push(e.ty.get()); },
-            None => {}
-          }
-        },
-        StmtKind::Block(block) => {
-          let (hc, ret) =  self.block_has_ret(block);
-          if hc { return (true, Ty::void()); }
-          ret_ty.push(ret);
-        },
-        _ => {}
-      }
-    }
-    let mut ret = &Ty::void();
-    // find first non-void
-    for t in &ret_ty { if *t != Ty::void() && *t != Ty::error() { ret = t; break } }
-    if *ret == Ty::void() { return (false, Ty::void()) }
-    for t in &ret_ty {
-      if *t == Ty::error() { continue }
-      // find max ret type
-      if ret.assignable_to(*t) { ret = t; }
-      else if t.assignable_to(*ret) {}
-      else { return (true, Ty::void()) ; }
-    }
-
-    (false, *ret)
-  }
-
-  fn get_block_ret(&mut self, b: &'a Block<'a>) -> Ty<'a> {
-    let mut ret_ty = Ty::void();
-    for stmt in &b.stmt {
-      match &stmt.kind {
-        StmtKind::If(i) => {
-          if let Some(blk) = &i.on_false { ret_ty = self.get_block_ret(blk); }
-          else { ret_ty = Ty::void(); }
-        },
-        StmtKind::While(_) => { ret_ty = Ty::void(); },
-        StmtKind::For(_) => { ret_ty = Ty::void(); }
-        StmtKind::Return(r) => {
-          match r { Some(e) => { ret_ty = e.ty.get(); }, None => { ret_ty = Ty::void(); } }
-        },
-        StmtKind::Block(block) => { ret_ty = self.get_block_ret(block); },
-        _ => { ret_ty = Ty::void(); }
-      }
-    }
-    ret_ty
-  }
-
-  fn dfs_block(&mut self, b: &'a Block<'a>) -> (bool, bool, Ty<'a>) {
-    let mut ret_ty = Ty::void();
-    let mut have_con = false;
-    let mut have_ret = false;
-    for stmt in &b.stmt {
-      match &stmt.kind {
-        StmtKind::If(i) => {
-          let (hc1, hr1, ret1) = self.dfs_block(&i.on_true); have_con |= hc1; have_ret |= hr1;
-          if let Some(blk) = &i.on_false {
-            let (hc2, hr2, ret2) = self.dfs_block(blk); have_con |= hc2; have_ret |= hr2;
-            // TODO: check if the other way is needed
-            if !ret1.assignable_to(ret2) { have_con = true;}
-            ret_ty = ret2;
-          }
-          else { ret_ty = Ty::void(); }
-        },
-        StmtKind::While(w) => {
-          let (hc, hr, _) = self.dfs_block(&w.body); have_con |= hc; have_ret |= hr;
-          ret_ty = Ty::void();
-        },
-        StmtKind::For(fo) => {
-          let (hc, hr, _) = self.dfs_block(&fo.body); have_con |= hc; have_ret |= hr;
-          ret_ty = Ty::void();
-        }
-        StmtKind::Return(r) => {
-          match r {
-            Some(e) => { ret_ty = e.ty.get(); if ret_ty != Ty::void() { have_ret = true; } },
-            None => ret_ty = Ty::void()
-          }
-        },
-        StmtKind::Block(block) => { let (hc, hr, ret) = self.dfs_block(block); have_con |= hc; ret_ty = ret; have_ret |= hr; },
-        _ => { ret_ty = Ty::void(); }
-      }
-    }
-    (have_con, have_ret, ret_ty)
-  }
-
   fn var_sel(&mut self, v: &'a VarSel<'a>, loc: Loc) -> Ty<'a> {
     // (no owner)not_found_var / ClassName(no field) / (no owner)method => UndeclaredVar
     // object.not_found_var => NoSuchField
@@ -526,7 +363,6 @@ impl<'a> TypePass<'a> {
     // object.field_var, where object's class is not self or any of ancestors => PrivateFieldAccess
 
     if let Some(owner) = &v.owner {
-//      println!("Varsel {:?}.{} @ {:?}", owner.loc, v.name, loc);
       self.cur_used = true;
       let owner = self.expr(owner);
       self.cur_used = false;
@@ -542,7 +378,6 @@ impl<'a> TypePass<'a> {
       match owner {
         Ty { arr: 0, kind: TyKind::Object(Ref(c)) } | Ty { arr: 0, kind: TyKind::Class(Ref(c)) } => {
           if let Some(sym) = c.lookup(v.name) {
-//            println!("Found {:?} in {}", sym, c.name);
             match sym {
               Symbol::Var(var) => {
                 // only allow self & descendants to access field
@@ -575,12 +410,8 @@ impl<'a> TypePass<'a> {
         e => e.error_or(|| self.issue(loc, BadFieldAccess { name: v.name, owner })),
       }
     } else {
-//      println!("Varsel (no owner) {} @ {:?}", v.name, loc);
       // if this stmt is in an VarDef, it cannot access the variable that is being declared
-      // TODO: need to check for special access
       if let Some(sym) = self.scopes.lookup_before(v.name, loc) {
-//        print!("Potential Conflict {} @ {:?}   ", v.name, loc);
-//        println!("Found {:?}", sym);
         match sym {
           Symbol::Var(var) => {
             if var.finish_loc < loc || var.loc > loc {
@@ -615,24 +446,8 @@ impl<'a> TypePass<'a> {
     }
 
   fn call(&mut self, c: &'a Call<'a>, loc: Loc) -> Ty<'a> {
-//    println!("Call at ({}, {})", loc.0, loc.1);
-    // TODO: make this work
-//    let v = if let ExprKind::VarSel(v) = &c.func.kind { v }
-////      else if let ExprKind::Lambda(l) = &c.func.kind { l }
-//      else { self.issue(loc, NotCallable { var: Ty::error() }); return Ty::error(); };
     let ty = self.expr(c.func.deref());
-//    println!("Caller type {:?}", ty);
     let ret_ty = match &ty {
-//      ExprKind::VarSel(v) => {
-//        ty = self.var_sel(&v, loc);
-//        if ty == Ty::error() { return ty; }
-//        if ty == Ty::int() {
-//          if !c.arg.is_empty() {
-//            self.issue(Loc(loc.0, loc.1 - 6), LengthWithArgument(c.arg.len() as u32))
-//          }
-//          return ty;
-//        }
-//        match &ty {
       Ty { arr: _, kind: TyKind::Length(_) } => {
         if !c.arg.is_empty() {
           if let ExprKind::VarSel(v) = &c.func.kind { self.issue(loc, ArgcMismatch { name: v.name, expect: 0, actual: c.arg.len() as u32}) }
@@ -682,52 +497,11 @@ impl<'a> TypePass<'a> {
       },
       Ty { arr: _, kind: TyKind::Error } => { Ty::error() }
       Ty { arr:_, kind: TyKind::Void } => { Ty::error() }
-      _ => { self.issue(loc, NotCallable { var: ty })}//self.issue(loc, NotCallable { var: ty }); }
+      _ => { self.issue(loc, NotCallable { var: ty })}
     };
   ret_ty
   }
 }
-//    let v = if let ExprKind::VarSel(v) = &c.func.kind { v } else { unimplemented!() };
-//    // get owner
-//    let owner = if let Some(owner) = &v.owner {
-//      self.cur_used = true;
-//      let owner = self.expr(owner);
-//      self.cur_used = false;
-//      if owner == Ty::error() { return Ty::error(); }
-//      // array length
-//      if v.name == LENGTH && owner.is_arr() {
-//        if !c.arg.is_empty() {
-//          self.issue(loc, LengthWithArgument(c.arg.len() as u32))
-//        }
-//        return Ty::int();
-//      }
-//      owner
-//    } else { Ty::mk_obj(self.cur_class.unwrap()) };
-//    match owner {
-//      Ty { arr: 0, kind: TyKind::Object(Ref(cl)) } | Ty { arr: 0, kind: TyKind::Class(Ref(cl)) } => {
-//        if let Some(sym) = cl.lookup(v.name) {
-//          match sym {
-//            Symbol::Func(f) => {
-//              c.func_ref.set(Some(f));
-//              if owner.is_class() && !f.static_ {
-//                // Class.not_static_method()
-//                self.issue(loc, BadFieldAccess { name: v.name, owner })
-//              }
-//              if v.owner.is_none() {
-//                let cur = self.cur_func.unwrap();
-//                if cur.static_ && !f.static_ {
-//                  self.issue(loc, RefInStatic { field: f.name, func: cur.name })
-//                }
-//              }
-//              self.check_arg_param(&c.arg, f.ret_param_ty.get().unwrap(), f.name, loc)
-//            }
-//            _ => self.issue(loc, NotFunc { name: v.name, owner }),
-//          }
-//        } else { self.issue(loc, NoSuchField { name: v.name, owner }) }
-//      }
-//      _ => self.issue(loc, BadFieldAccess { name: v.name, owner }),
-//    }
-//  }
 
 impl<'a> TypePass<'a> {
   fn check_bool(&mut self, e: &'a Expr<'a>) {

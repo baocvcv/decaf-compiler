@@ -19,18 +19,6 @@ impl<'a> ScopeStack<'a> {
       .next()
   }
 
-  // do lookup, but will ignore those local symbols whose loc >= the given loc
-//  pub fn lookup_before(&self, name: &'a str) -> Option<(Symbol<'a>, ScopeOwner<'a>)> {
-//    self.stack.iter().rev().chain(iter::once(&self.global))
-//        .filter_map(|&owner| owner.scope().get(name).cloned()
-//          .filter(|sym| !owner.is_local()).map(|sym| (sym, owner)))
-//        .next()
-//  }
-//  pub fn lookup_before(&self, name: &'a str, loc: Loc) -> Option<Symbol<'a>> {
-//    self.stack.iter().rev().chain(iter::once(&self.global))
-//        .filter_map(|&owner| owner.scope().get(name).cloned().filter(|sym| !(owner.is_local() && sym.loc() >= loc)))
-//        .next()
-//  }
   pub fn lookup_before(&self, name: &'a str, loc: Loc) -> Option<Symbol<'a>> {
     self.stack.iter().rev().chain(iter::once(&self.global))
         .filter_map(|&owner| owner.scope().get(name)//.map(|&sym| (sym, owner))
@@ -38,20 +26,6 @@ impl<'a> ScopeStack<'a> {
             .filter(|sym| !(owner.is_local() && sym.loc() >= loc)))
         .next()
   }
-//
-//        Some(t)
-//    } else {
-//      None
-//    };
-//
-//    for owner in self.stack.iter().rev().chain(iter::once(self.global)) {
-//      if let Some(sym) = owner.scope().get(name).cloned() {
-//        if owner.is_local() or sym.loc() >= loc { return None }
-//        else if owner.is_lambda(
-//
-//      }
-//
-//    }
 
   pub fn declare(&mut self, sym: Symbol<'a>) {
     self.cur_owner().scope_mut().insert(sym.name(), sym);

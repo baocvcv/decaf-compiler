@@ -81,7 +81,6 @@ impl<'a> SymbolPass<'a> {
     }); // scoped
 
     if !c.abstract_ {
-//      println!("Class {}", c.name);
       // find all undefined abstract methods
       let mut parent_stack: Vec<&'a ClassDef<'a>> = vec![];
       let mut cls = c;
@@ -89,8 +88,6 @@ impl<'a> SymbolPass<'a> {
         parent_stack.push(cls.parent_ref.get().unwrap());
         cls = cls.parent_ref.get().unwrap();
       }
-//      println!("Parent_stack: ");
-//      for a in parent_stack.iter() { println!("{}", a.name); }
       let mut ab_methods = HashMap::new();
       for p in parent_stack.iter().rev() {
         for f in &p.field {
@@ -102,16 +99,12 @@ impl<'a> SymbolPass<'a> {
           }
         }
       }
-//      println!("Ab_methods:");
-//      for a in ab_methods.keys() { println!("{}: {}", a, ab_methods[a].name); }
-
       let mut ok = true;
       for f in &c.field {
         // if not abstract cannot have abstract methods
         if let FieldDef::FuncDef(func) = f {
           if func.abstract_ { ok = false; }
           else if !func.static_ { // remove overwritten abstract funcdefs
-            //TODO: cannot use assignable to compare func defs
             if ab_methods.contains_key(func.name) && Ty::mk_func(func).assignable_to(Ty::mk_func(ab_methods[func.name].0)) {
               ab_methods.remove(func.name);
             }
@@ -124,7 +117,6 @@ impl<'a> SymbolPass<'a> {
   }
 
   fn func_def(&mut self, f: &'a FuncDef<'a>) {
-    // TODO: jaewoifjwoifego;sf
     let ret_ty = self.ty(&f.ret, false);
     self.scoped(ScopeOwner::Param(f), |s| {
       if !f.static_ { s.scopes.declare(Symbol::This(f)); }
@@ -163,17 +155,6 @@ impl<'a> SymbolPass<'a> {
   }
 
   fn var_def(&mut self, v: &'a VarDef<'a>) {
-//    println!("{}: {:?}", v.name, v.loc);
-//    for scope in self.scopes.stack.iter().rev() {
-//      print!("{:?}  ", scope);
-//    }
-//    println!("");
-//    if v.syn_ty.kind == SynTyKind::Lambda {
-//      let ty = TyKind::Lambda(self.parse_lambda_type(&v.syn_ty));
-//      v.ty.set(Ty { arr: v.syn_ty.arr, kind: ty });
-//    } else {
-//      v.ty.set(self.ty(&v.syn_ty, false));
-//    }
     v.ty.set(self.ty(&v.syn_ty, false));
     if v.ty.get() == Ty::void() { self.issue(v.loc, VoidVar(v.name)) }
     let ok = if let Some((sym, owner)) = self.scopes.lookup(v.name) {
@@ -194,10 +175,8 @@ impl<'a> SymbolPass<'a> {
   }
 
   fn lambda(&mut self, l: &'a Lambda<'a>) {
-//    println!("Declaring lambda @ {:?}", l.loc);
     // declare lambda
     self.scopes.declare(Symbol::Lambda(l));
-//    let ret_ty = Ty::new(TyKind::Error); // dummy
     // open new scope for lambda
     self.scoped(ScopeOwner::Lambda(l), |s| {
       // check all the params and block stmts

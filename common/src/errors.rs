@@ -128,7 +128,6 @@ impl<Ty: fmt::Debug> fmt::Debug for ErrorKind<'_, Ty> {
       NotCallable { var} => write!(f, "{:?} is not a callable type", var),
       LambdaArgcMismatch {expect, actual } => write!(f, "lambda expression expects {} argument(s) but {} given", expect, actual),
       NoAssignMemberMethod(name) => write!(f, "cannot assign value to class member method '{}'", name),
-
     }
   }
 }
