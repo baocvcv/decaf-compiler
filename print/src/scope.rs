@@ -42,16 +42,18 @@ pub fn block(b: &Block, p: &mut IndentPrinter) {
     show_scope(&b.scope.borrow(), p);
     for s in &b.stmt {
       match &s.kind {
+        StmtKind::Assign(a) => { expr(&a.dst, p); expr(&a.src, p); }
+        StmtKind::LocalVarDef(v) => if let Some( e) = v.init() { expr(e, p); }
+        StmtKind::ExprEval(e) => expr(e, p),
         StmtKind::If(i) => {
           block(&i.on_true, p);
           if let Some(on_false) = &i.on_false { block(on_false, p); }
         }
         StmtKind::While(w) => block(&w.body, p),
         StmtKind::For(f) => block(&f.body, p),
+        StmtKind::Return(r) => if let Some(e) = &r { expr(e, p); }
+        StmtKind::Print(v) => { for e in v { expr(e, p) } }
         StmtKind::Block(b) => block(b, p),
-        StmtKind::LocalVarDef(v) => { if let Some((l, e)) = &v.init { if let ExprKind::Lambda(l) = &e.kind { lambda(l, p); } } }
-        StmtKind::Assign(a) => { if let ExprKind::Lambda(l) = &a.src.kind { lambda(l, p); }}
-        StmtKind::ExprEval(e) => expr(e, p),
         _ => {}
       }
     }
@@ -65,19 +67,23 @@ pub fn lambda(l: &Lambda, p: &mut IndentPrinter) {
     if let Some(b) = &l.body.body { block(b, p); }
     else if let Some(e) = &l.body.expr {
       write!(p, "LOCAL SCOPE:").ignore();
-      p.indent(|pp| { show_scope(&e.scope.borrow(), pp); } );
+      p.indent(|pp| {
+        show_scope(&e.scope.borrow(), pp);
+        expr(e, pp);
+      });
     }
   });
 }
 
 pub fn expr(e: &Expr, p: &mut IndentPrinter) {
   match &e.kind {
-    ExprKind::Lambda(l) => { lambda(l, p); },
-    ExprKind::Unary(u) => { expr(u.r.borrow(), p); },
-    ExprKind::Binary(b) => {
-      expr(b.l.borrow(), p);
-      expr(b.r.borrow(), p);
-    },
+    ExprKind::VarSel(v) => if let Some(owner) = &v.owner { expr(owner.as_ref(), p); }
+    ExprKind::IndexSel(i) => { expr(&i.arr, p); expr(&i.idx, p); }
+    ExprKind::Call(c) => { expr(c.func.as_ref(), p); for pr in &c.arg { expr(pr, p); } }
+    ExprKind::Unary(u) => expr(u.r.borrow(), p),
+    ExprKind::Binary(b) => { expr(b.l.borrow(), p); expr(b.r.borrow(), p); },
+    ExprKind::NewArray(n) => expr(&n.len, p),
+    ExprKind::Lambda(l) => lambda(l, p),
     _ => {}
   }
 }

@@ -39,6 +39,8 @@ pub enum TyKind<'a> {
   Func(&'a [Ty<'a>]),
   Lambda(&'a [Ty<'a>]),
   Length(&'a [Ty<'a>]),
+  // undetermined
+  Var,
 }
 
 impl Default for TyKind<'_> {
@@ -67,9 +69,10 @@ impl<'a> Ty<'a> {
       (Error, _) | (_, Error) => true,
       _ => self.arr == rhs.arr && match (self.kind, rhs.kind) {
         (Int, Int) | (Bool, Bool) | (String, String) | (Void, Void) => true,
-        (Object(c1), Object(Ref(c2))) => c1.extends(c2),
-        (Null, Object(_)) => true,
-        (Func(rp1), Func(rp2)) | (Func(rp1), Lambda(rp2)) | (Lambda(rp1), Func(rp2)) | (Lambda(rp1), Lambda(rp2)) => {
+        (Object(c1), Object(Ref(c2))) | (Class(c1), Class(Ref(c2))) | (Class(c1), Object(Ref(c2))) | (Object(c1), Class(Ref(c2))) => c1.extends(c2),
+        (Null, Object(_)) | (Null, Class(_)) => true,
+        (Null, Null) => true,
+        (Func(rp1), Func(rp2)) | (Func(rp1), Lambda(rp2)) | (Lambda(rp1), Func(rp2)) | (Lambda(rp1), Lambda(rp2)) | (Length(rp1), Length(rp2)) | (Length(rp1), Lambda(rp2)) | (Length(rp1), Func(rp2)) | (Func(rp1), Length(rp2)) | (Lambda(rp1), Length(rp2)) => {
           let (r1, p1, r2, p2) = (&rp1[0], &rp1[1..], &rp2[0], &rp2[1..]);
           r1.assignable_to(*r2) && p1.len() == p2.len() && p1.iter().zip(p2.iter()).all(|(p1, p2)| p2.assignable_to(*p1))
         },
@@ -120,6 +123,7 @@ impl fmt::Debug for Ty<'_> {
         }
         write!(f, ")")
       }
+      TyKind::Var => write!(f, "var"),
     }?;
     for _ in 0..self.arr { write!(f, "[]")?; }
     Ok(())

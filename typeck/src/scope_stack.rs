@@ -20,12 +20,24 @@ impl<'a> ScopeStack<'a> {
   }
 
   // do lookup, but will ignore those local symbols whose loc >= the given loc
+//  pub fn lookup_before(&self, name: &'a str) -> Option<(Symbol<'a>, ScopeOwner<'a>)> {
+//    self.stack.iter().rev().chain(iter::once(&self.global))
+//        .filter_map(|&owner| owner.scope().get(name).cloned()
+//          .filter(|sym| !owner.is_local()).map(|sym| (sym, owner)))
+//        .next()
+//  }
+//  pub fn lookup_before(&self, name: &'a str, loc: Loc) -> Option<Symbol<'a>> {
+//    self.stack.iter().rev().chain(iter::once(&self.global))
+//        .filter_map(|&owner| owner.scope().get(name).cloned().filter(|sym| !(owner.is_local() && sym.loc() >= loc)))
+//        .next()
+//  }
   pub fn lookup_before(&self, name: &'a str, loc: Loc) -> Option<Symbol<'a>> {
     self.stack.iter().rev().chain(iter::once(&self.global))
-      .filter_map(|&owner| owner.scope().get(name)//.map(|&sym| (sym, owner))
-      .cloned()
-      .filter(|sym| !(sym.loc() >= loc)))
-      .next()
+        .filter_map(|&owner| owner.scope().get(name)//.map(|&sym| (sym, owner))
+            .cloned()
+            .filter(|sym| !(owner.is_local() && sym.loc() >= loc)))
+        .next()
+  }
 //
 //        Some(t)
 //    } else {
@@ -40,7 +52,6 @@ impl<'a> ScopeStack<'a> {
 //      }
 //
 //    }
-  }
 
   pub fn declare(&mut self, sym: Symbol<'a>) {
     self.cur_owner().scope_mut().insert(sym.name(), sym);
@@ -67,7 +78,6 @@ impl<'a> ScopeStack<'a> {
   pub fn cur_owner(&self) -> ScopeOwner<'a> {
     *self.stack.last().unwrap_or(&self.global)
   }
-Varsel (no owner) clearArray @ (20,15)
 
   pub fn lookup_class(&self, name: &'a str) -> Option<&'a ClassDef<'a>> {
     self.global.scope().get(name).map(|class| match class {

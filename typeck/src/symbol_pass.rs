@@ -1,9 +1,8 @@
 use crate::{TypeCk, TypeCkTrait};
 use common::{ErrorKind::*, Ref, MAIN_CLASS, MAIN_METHOD, NO_LOC, HashMap, HashSet};
-use syntax::{ast::*, ScopeOwner, Symbol, Ty, TyKind, SynTyKind, SynTy};
+use syntax::{ast::*, ScopeOwner, Symbol, Ty, SynTyKind};
 use std::{ops::{Deref, DerefMut}, iter};
 use hashbrown::hash_map::Entry;
-use std::borrow::Borrow;
 
 pub(crate) struct SymbolPass<'a>(pub TypeCk<'a>);
 
@@ -190,15 +189,15 @@ impl<'a> SymbolPass<'a> {
       v.owner.set(Some(self.scopes.cur_owner()));
       self.scopes.declare(Symbol::Var(v));
     }
-    // add lambda expr to scope
-    if let Some((loc, e)) = &v.init { if let ExprKind::Lambda(f) = &e.kind { self.lambda(f); } }
+    // inspect init expr
+    if let Some(e) = v.init() { self.expr(e); }
   }
 
   fn lambda(&mut self, l: &'a Lambda<'a>) {
-    println!("Declaring lambda @ {:?}", l.loc);
+//    println!("Declaring lambda @ {:?}", l.loc);
     // declare lambda
     self.scopes.declare(Symbol::Lambda(l));
-    let ret_ty = Ty::new(TyKind::Error); // dummy
+//    let ret_ty = Ty::new(TyKind::Error); // dummy
     // open new scope for lambda
     self.scoped(ScopeOwner::Lambda(l), |s| {
       // check all the params and block stmts
@@ -223,8 +222,9 @@ impl<'a> SymbolPass<'a> {
 
   fn stmt(&mut self, s: &'a Stmt<'a>) {
     match &s.kind {
-      StmtKind::Assign(a) => self.expr(&a.src),
+      StmtKind::Assign(a) => { self.expr(&a.dst); self.expr(&a.src); }
       StmtKind::LocalVarDef(v) => self.var_def(v),
+      StmtKind::ExprEval(e) => { self.expr(e); },
       StmtKind::If(i) => {
         self.block(&i.on_true);
         if let Some(of) = &i.on_false { self.block(of); }
@@ -235,18 +235,22 @@ impl<'a> SymbolPass<'a> {
         s.stmt(&f.update);
         for st in &f.body.stmt { s.stmt(st); }
       }),
+      StmtKind::Return(r) => { if let Some(e) = &r { self.expr(e); } }
+      StmtKind::Print(v) => { for e in v { self.expr(e) } }
       StmtKind::Block(b) => self.block(b),
-      StmtKind::Return(r) => { if let Some(e) = &r { self.expr(e); } },
-      StmtKind::ExprEval(e) => { self.expr(e); },
       _ => {}
     };
   }
 
   fn expr(&mut self, e: &'a Expr<'a>) {
     match &e.kind {
-      ExprKind::Lambda(l) => { self.lambda(l); },
-      ExprKind::Unary(u) => { self.expr(u.r.deref()); },
+      ExprKind::VarSel(v) => if let Some(owner) = &v.owner { self.expr(owner.as_ref()); }
+      ExprKind::IndexSel(i) => { self.expr(&i.arr); self.expr(&i.idx); }
+      ExprKind::Call(c) => { self.expr(c.func.deref()); for pr in &c.arg { self.expr(pr); } }
+      ExprKind::Unary(u) => self.expr(u.r.deref()),
       ExprKind::Binary(b) => { self.expr(b.l.deref()); self.expr(b.r.deref()); },
+      ExprKind::NewArray(n) => self.expr(&n.len),
+      ExprKind::Lambda(l) => self.lambda(l),
       _ => {}
     }
   }
