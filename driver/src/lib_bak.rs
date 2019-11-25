@@ -3,10 +3,8 @@
 pub mod test_util;
 
 use common::{IndentPrinter, Errors};
-use syntax::{ASTAlloc, Ty, parser, parser_ll};
+use syntax::{ASTAlloc, Ty, parser};
 use typeck::TypeCkAlloc;
-use tac::TacNode;
-use typed_arena::Arena;
 
 pub use test_util::*;
 
@@ -26,7 +24,6 @@ pub struct CompileCfg {
 pub struct Alloc<'a> {
   ast: ASTAlloc<'a>,
   typeck: TypeCkAlloc<'a>,
-  tac: Arena<TacNode<'a>>,
 }
 
 // it is recommended to use this function to debug your compiler
@@ -34,8 +31,8 @@ pub struct Alloc<'a> {
 pub fn compile<'a>(code: &'a str, alloc: &'a Alloc<'a>, cfg: CompileCfg) -> Result<String, Errors<'a, Ty<'a>>> {
   let mut p = IndentPrinter::default();
   let pr = match cfg.parser {
-    Parser::LL => parser_ll::work(code, &alloc.ast)?,
-    Parser::LR => unimplemented!(), //parser::work(code, &alloc.ast)?,
+    Parser::LL => { unimplemented!() }, //parser_ll::work(code, &alloc.ast)?,
+    Parser::LR => parser::work(code, &alloc.ast)?,
   };
   if cfg.stage == Stage::Parse {
     print::ast::program(&pr, &mut p);
@@ -44,11 +41,6 @@ pub fn compile<'a>(code: &'a str, alloc: &'a Alloc<'a>, cfg: CompileCfg) -> Resu
   typeck::work(&pr, &alloc.typeck)?;
   if cfg.stage == Stage::TypeCk {
     print::scope::program(&pr, &mut p);
-    return Ok(p.finish());
-  }
-  let tp = tacgen::work(&pr, &alloc.tac);
-  if cfg.stage == Stage::Tac {
-    print::tac::program(&tp, &mut p);
     return Ok(p.finish());
   }
   unimplemented!()
