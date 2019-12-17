@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>PA3 实验报告</title>
+        
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+        
+        <style>
+.task-list-item { list-style-type: none; } .task-list-item-checkbox { margin-left: -20px; vertical-align: middle; }
+</style>
+        <style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        
+        
+    </head>
+    <body class="vscode-light">
+        <h1 id="pa3-%e5%ae%9e%e9%aa%8c%e6%8a%a5%e5%91%8a">PA3 实验报告</h1>
+<p>2018011289 包涵</p>
+<h2 id="%e5%ae%9e%e9%aa%8c%e7%ae%80%e8%bf%b0">实验简述</h2>
+<ul>
+<li>扩展call
+<ul>
+<li>首先修改LocalVarDef，让函数对象初始化为指向大小为8的内存区域的指针</li>
+<li>修改varsel，让varsel在select到函数时，返回函数对象的指针，包括函数指针和可选的this</li>
+<li>修改call，直接利用函数对象进行函数调用</li>
+</ul>
+</li>
+<li>方法名当作函数使用
+<ul>
+<li>修改varsel，让varsel对于各种情况都可以正确返回一个函数对象</li>
+</ul>
+</li>
+<li>lambda表达式
+<ul>
+<li>首先生成lambda表达式对应的函数，利用lambda表达式栈和参数栈，中断当前函数的parsing，生成lambda表达式之后，再恢复对当前函数的parsing</li>
+<li>然后生成lambda函数的对象，包括函数指针、可选的this和捕获变量，将生成的函数对象返回</li>
+<li>根据Call的种类和传递的类型信息，决定调用的方式，相应修改传递参数的方式和数量</li>
+<li>相应修改this和varsel在lambda表达式中的行为</li>
+</ul>
+</li>
+</ul>
+<h2 id="%e6%8c%91%e6%88%98%e5%92%8c%e8%a7%a3%e5%86%b3%e6%96%b9%e6%b3%95">挑战和解决方法</h2>
+<ul>
+<li>pa2的实现细节已经忘了，这次又要对pa2的代码做很多的修改，包括确定捕获变量、传递更丰富的类型信息等，非常痛苦，又复习了一边pa2的代码</li>
+<li>对rust语言的特性不熟悉，导致很久都没有找到在ast中记录捕获变量的合适的数据结构，最终用了refcell才得以实现</li>
+<li>没有完全看懂文档，只好部分按照自己的思路来实现，可能是出现bug的原因。</li>
+</ul>
+
+    </body>
+    </html>
