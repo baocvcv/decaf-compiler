@@ -21,7 +21,7 @@ pub fn program(pr: &TacProgram, p: &mut IndentPrinter) {
     p.indent(|p| {
       let mut iter = f.first; // manually iterate, because we don't have TacIter to use
       while let Some(t) = iter {
-        write%ac(t.tac.get(), pr, p);
+        write_tac(t.tac.get(), pr, p);
         iter = t.next.get();
       }
     });
@@ -29,7 +29,7 @@ pub fn program(pr: &TacProgram, p: &mut IndentPrinter) {
   }
 }
 
-pub fn write%ac(t: Tac, pr: &TacProgram, p: &mut IndentPrinter) {
+pub fn write_tac(t: Tac, pr: &TacProgram, p: &mut IndentPrinter) {
   use Tac::*;
   match t {
     Bin { op, dst, lr } => write!(p, "%{} = ({:?} {} {:?})", dst, lr[0], op.to_op_str(), lr[1]),
@@ -37,7 +37,8 @@ pub fn write%ac(t: Tac, pr: &TacProgram, p: &mut IndentPrinter) {
     Assign { dst, src } => write!(p, "%{} = {:?}", dst, src[0]),
     Param { src } => write!(p, "parm {:?}", src[0]),
     Call { dst, kind, } => write!(p, "{}call {}", dst.map(|dst| format!("%{} = ", dst)).unwrap_or(String::new()), match kind {
-      CallKind::Virtual(fp, _) => format!("{:?}", fp[0]),
+      //TODO: not right
+      CallKind::Virtual(fp, _) | CallKind::Lambda(fp, _) => format!("{:?}", fp[0]),
       CallKind::Static(f, _) => pr.func[f as usize].name.clone(),
       CallKind::Intrinsic(i) => i.name().to_owned(),
     }),

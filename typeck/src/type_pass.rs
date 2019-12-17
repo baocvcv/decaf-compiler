@@ -65,7 +65,7 @@ impl<'a> TypePass<'a> {
                     } else { break }
                   }
                 } else if scope.is_class() {
-                  // defined in class
+                  // 3 defined in class
                   if let Some(_) = scope.scope().get(v.name) { break }
                 }
               }
@@ -79,12 +79,26 @@ impl<'a> TypePass<'a> {
             }
           }
         }
+        if let ExprKind::VarSel(v) = &a.dst.kind {
+          if let Some(vd) = &v.var.get() {
+            match &a.src.kind {
+              ExprKind::VarSel(v2) => if let Some(vd2) = &v2.var.get() {
+//                println!("Set {} at {:?} to {:?}", vd.name, s.loc, vd2.cur.get().unwrap().loc);
+                vd.cur.set(vd2.cur.get());
+              }
+              _ => {
+//                println!("Set {} at {:?} to {:?}", vd.name, s.loc, a.src.loc);
+                vd.cur.set(Some(&a.src));
+              }
+            }
+          }
+        }
         false
       }
       StmtKind::LocalVarDef(v) => {
         if let Some((loc, e)) = &v.init {
           let (l, r) = (v.ty.get(), self.expr(e));
-          // TODO: how to assign inferred def to var???
+          v.cur.set(Some(e));
           if v.syn_ty.kind == SynTyKind::Var {
             v.ty.set( r.clone());
             if v.ty.get().kind == TyKind::Void { self.issue(v.loc, VoidVar(v.name)) }
@@ -213,16 +227,22 @@ impl<'a> TypePass<'a> {
       Lambda(l) => {
         // now only inference of ret type is performed here
         // but more could be added
+        // TODO: need to know all the captured vars of this lambda and
+        // TODO: the captured vars of the lambda it contains
         let mut ty = Ty::new(TyKind::Void);
         if let Some(b) = &l.body.expr {
+          self.lambda_stack.push(l);
           self.lambda_cnt += 1;
+//          println!("{:?}", l.loc);
           self.scopes.open(ScopeOwner::Lambda(l));
           ty = self.expr(b.deref());
           self.scopes.close();
           self.lambda_cnt -= 1;
         } else if let Some(b) = &l.body.body {
           // deal with lambda body
+          self.lambda_stack.push(l);
           self.lambda_cnt += 1;
+//          println!("{:?}", l.loc);
           self.scopes.open(ScopeOwner::Lambda(l));
           let have_ret = self.block(b);
           self.scopes.close();
@@ -234,6 +254,27 @@ impl<'a> TypePass<'a> {
           if have_conflict { self.issue(b.loc, BadReturnInBlock) }
           ty = *ret_ty;
         };
+//        println!("stack size: {}", self.lambda_stack.len());
+        //TODO: pop all the lambdas before the current lambda and process their "captured vars"
+//        println!("Last on stack: {:?}", self.lambda_stack.last().unwrap().loc);
+        while self.lambda_stack.last().unwrap().loc != l.loc {
+          let l_tmp = self.lambda_stack.pop().unwrap();
+          l.this.set(l_tmp.this.get());
+          for var in l_tmp.captured_vars.borrow().iter() {
+            if var.finish_loc < l.loc { // local var def outside l
+              l.captured_vars.borrow_mut().push(*var);
+            }
+          }
+        }
+//        print!("Lambda@{:?} Captured vars: ", l.loc);
+//        if let Some(c) = l.this.get() { print!("this:{} ", c.name)}
+//        for var in l.captured_vars.borrow().iter() {
+//          print!("{}@{:?} ", var.name, var.loc);
+//        }
+//        println!();
+        // if cur lambda is the only one on the stack, pop it
+        if self.lambda_cnt == 0 { self.lambda_stack.pop(); }
+
         let ret_param_ty = iter::once(ty).chain(l.param.iter().map(|v| v.ty.get()));
         let ret_param_ty = self.alloc.ty.alloc_extend(ret_param_ty);
         l.ret_param_ty.set(Some(ret_param_ty));
@@ -371,8 +412,6 @@ impl<'a> TypePass<'a> {
       else if owner.is_arr() && v.name == LENGTH {
         let ret_param_ty = vec![Ty::int()];
         let ret_param_ty = self.alloc.ty.alloc_extend(ret_param_ty);
-        // TODO: set funcdef for arr
-//        v.func.set(Some())
         return Ty::new(TyKind::Length(ret_param_ty));
       }
       match owner {
@@ -416,9 +455,16 @@ impl<'a> TypePass<'a> {
           Symbol::Var(var) => {
             if var.finish_loc < loc || var.loc > loc {
               let mut ok = true;
-              if var.owner.get().unwrap().is_class() {
+              if let ScopeOwner::Class(c) = &var.owner.get().unwrap() {
+                // var is class member
                 let cur = self.cur_func.unwrap();
-                if cur.static_{ ok = false; self.issue(loc, RefInStatic { field: v.name, func: cur.name }) }
+                if cur.static_ { ok = false; self.issue(loc, RefInStatic { field: v.name, func: cur.name }) }
+                if let Some(l) = self.lambda_stack.last() { l.this.set(Some(c)); }
+              } else if let Some(l) = self.lambda_stack.last() {
+                if var.finish_loc < l.loc {
+                  // local vardef outside current block
+                  l.captured_vars.borrow_mut().push(var);
+                }
               }
               if ok { v.var.set(Some(var)); }
               var.ty.get()
@@ -426,12 +472,15 @@ impl<'a> TypePass<'a> {
               self.issue(loc, UndeclaredVar(v.name))
             }
           }
+          //TODO: check if this need adding to captured_vars
           Symbol::Class(c) if self.cur_used => { Ty::mk_class(c) },
           Symbol::Func(func) => {
             // search for func in cur class
             let owner = self.cur_class.unwrap();
             if let Some(sym) = owner.lookup(func.name) {
               let cur = self.cur_func.unwrap();
+              // add this to lambda
+              if let Some(l) = self.lambda_stack.last() { l.this.set(Some(owner)); }
               if cur.static_ && !func.static_ { self.issue(loc, RefInStatic { field: v.name, func: cur.name }) }
               else if let Symbol::Func(f) = sym {
                   v.func.set(Some(func));
@@ -449,12 +498,15 @@ impl<'a> TypePass<'a> {
     let ty = self.expr(c.func.deref());
     let ret_ty = match &ty {
       Ty { arr: _, kind: TyKind::Length(_) } => {
+        // func Length assigned to some var
+        // var c = some_array.length; c();
         if !c.arg.is_empty() {
           if let ExprKind::VarSel(v) = &c.func.kind { self.issue(loc, ArgcMismatch { name: v.name, expect: 0, actual: c.arg.len() as u32}) }
           else { self.issue(loc, LengthWithArgument(c.arg.len() as u32)) }
         } else { return Ty::int(); }
       }
       Ty { arr: len, kind: _ } if *len > 0 => {
+        // some_array.length()
         if let ExprKind::VarSel(v) = &c.func.kind {
           if v.name == LENGTH {
             if !c.arg.is_empty() {
@@ -463,8 +515,9 @@ impl<'a> TypePass<'a> {
           } else { self.issue(loc, NoSuchField { name: v.name, owner: ty }) }
         } else { self.issue(loc, NotCallable { var: ty }) }
       },
-      Ty { arr: 0, kind: TyKind::Func(_param) } => {
-        let v = if let ExprKind::VarSel(v) = &c.func.kind { v } else { unimplemented!() };
+      Ty { arr: 0, kind: TyKind::Func(param) } => if let ExprKind::VarSel(v) = &c.func.kind {
+        // calling a function
+//        let v = if let ExprKind::VarSel(v) = &c.func.kind { v } else { unimplemented!() };
         let owner = if let Some(owner) = &v.owner { owner.ty.get() }  else { Ty::mk_obj(self.cur_class.unwrap()) };
         match owner {
           Ty { arr: 0, kind: TyKind::Object(Ref(cl)) } | Ty { arr: 0, kind: TyKind::Class(Ref(cl)) } => {
@@ -490,13 +543,38 @@ impl<'a> TypePass<'a> {
           }
           _ => self.issue(loc, BadFieldAccess { name: v.name, owner }),
         }
-      },
+      } else {
+        self.check_lambda_param(&c.arg, param, loc)
+      }
+//      Ty { arr: 0, kind: TyKind::Func(_param) } => {}
       Ty { arr: 0, kind: TyKind::Lambda(param) } => {
-        if let ExprKind::VarSel(v) = &c.func.kind { self.check_arg_param(&c.arg, param, v.name, loc)
+        // calling a Lambda
+        if let ExprKind::VarSel(v) = &c.func.kind {
+          if let Some(vardef) = &v.var.get() {
+            if let Some(init) = &vardef.init() {
+              if let ExprKind::Lambda(l) = &init.kind {
+                c.lambda_ref.set(Some(l));
+              }
+            }
+            if let Some(e) = &vardef.cur.get() {
+              match &e.kind {
+                ExprKind::Lambda(l) => { c.lambda_ref.set(Some(l)); }
+                ExprKind::VarSel(v2) => if let Some(f) = &v2.func.get() {
+                  c.func_ref.set(Some(f));
+                }
+                _ => {
+//                  println!("{:?}", loc);
+//                  unimplemented!()
+                  //TODO: any better options?
+                }
+              }
+            }
+          }
+          self.check_arg_param(&c.arg, param, v.name, loc)
         } else { self.check_lambda_param(&c.arg, param, loc)}
       },
       Ty { arr: _, kind: TyKind::Error } => { Ty::error() }
-      Ty { arr:_, kind: TyKind::Void } => { Ty::error() }
+      Ty { arr: _, kind: TyKind::Void } => { Ty::error() }
       _ => { self.issue(loc, NotCallable { var: ty })}
     };
   ret_ty

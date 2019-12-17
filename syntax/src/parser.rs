@@ -168,7 +168,7 @@ impl<'p> Parser<'p> {
   // the `VarDef` in grammar only supports VarDef without init value
   #[rule(VarDef -> Type Id)]
   fn var_def(&self, syn_ty: SynTy<'p>, name: Token) -> &'p VarDef<'p> {
-    self.alloc.var.alloc(VarDef { loc: name.loc(), name: name.str(), syn_ty, init: None, ty: dft(), owner: dft(), finish_loc: Loc(lexer.line, lexer.col) })
+    self.alloc.var.alloc(VarDef { loc: name.loc(), name: name.str(), syn_ty, init: None, ty: dft(), owner: dft(), finish_loc: Loc(lexer.line, lexer.col), cur: dft(), reg: dft() })
   }
 
   #[rule(VarDefListOrEmpty -> VarDefList)]
@@ -227,12 +227,12 @@ impl<'p> Parser<'p> {
   #[rule(Simple -> Type Id Assign Expr)] // the VarDef with init
   fn simple_var_def_init(&self, syn_ty: SynTy<'p>, name: Token, a: Token, init: Expr<'p>) -> Stmt<'p> {
     let loc = name.loc();
-    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty, init: Some((a.loc(), init)), ty: dft(), owner: dft(), finish_loc: Loc(lexer.line, lexer.col) })).into())
+    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty, init: Some((a.loc(), init)), ty: dft(), owner: dft(), finish_loc: Loc(lexer.line, lexer.col), cur: dft(), reg: dft() })).into())
   }
   #[rule(Simple -> Var Id Assign Expr)]
   fn simple_auto_var_def(&self, v: Token, name: Token, a: Token, init: Expr<'p>) -> Stmt<'p> {
     let loc = name.loc();
-    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty: SynTy { loc: v.loc(), arr: 0, kind: SynTyKind::Var, rt: None, tl: vec![] }, init: Some((a.loc(), init)), ty: dft(), owner: dft(), finish_loc: Loc(lexer.line, lexer.col) })).into())
+    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty: SynTy { loc: v.loc(), arr: 0, kind: SynTyKind::Var, rt: None, tl: vec![] }, init: Some((a.loc(), init)), ty: dft(), owner: dft(), finish_loc: Loc(lexer.line, lexer.col), cur: dft(), reg: dft() })).into())
   }
   #[rule(Simple -> Expr)]
   fn simple_mk_expr(e: Expr<'p>) -> Stmt<'p> { mk_stmt(e.loc, e.into()) }
@@ -321,11 +321,11 @@ impl<'p> Parser<'p> {
   }
   #[rule(Expr -> Func LPar VarDefListOrEmpty RPar To Expr)]
   fn expr_lambda1(f: Token, _lp: Token, pa: Vec<&'p VarDef<'p>>, _rp: Token, _t: Token, e: Expr<'p>) -> Expr<'p> {
-    mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, name: format!("lambda@{:?}", f.loc()), body: LambdaBody { expr: Some(Box::new(e)), body: None }, ret_param_ty: dft(), class: dft(), scope: dft() }.into())
+    mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, name: format!("lambda@{:?}", f.loc()), body: LambdaBody { expr: Some(Box::new(e)), body: None }, this: dft(), captured_vars: dft(), ret_param_ty: dft(), class: dft(), scope: dft() }.into())
   }
   #[rule(Expr -> Func LPar VarDefListOrEmpty RPar Block)]
   fn expr_lambda0(f: Token, _lp: Token, pa: Vec<&'p VarDef<'p>>, _rp: Token, b: Block<'p>) -> Expr<'p> {
-    mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, name: format!("lambda@{:?}", f.loc()), body: LambdaBody { expr: None, body: Some(b) }, ret_param_ty: dft(), class: dft(), scope: dft() }.into())
+    mk_expr(f.loc(), Lambda { loc: f.loc(), param: pa, name: format!("lambda@{:?}", f.loc()), body: LambdaBody { expr: None, body: Some(b) }, this: dft(), captured_vars: dft(), ret_param_ty: dft(), class: dft(), scope: dft() }.into())
   }
 
   #[rule(ExprList -> ExprList Comma Expr)]
@@ -345,7 +345,7 @@ impl<'p> Parser<'p> {
 
   #[rule(VarSel -> MaybeOwner Id)]
   fn var_sel(owner: Option<Box<Expr<'p>>>, name: Token) -> Expr<'p> {
-    mk_expr(name.loc(), VarSel { owner, name: name.str(), var: dft(), func: dft(), lambda: dft() }.into())
+    mk_expr(name.loc(), VarSel { owner, name: name.str(), var: dft(), func: dft() }.into())
   }
 
   #[rule(LValue -> VarSel)]

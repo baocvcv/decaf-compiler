@@ -81,6 +81,18 @@ impl<'a> Ty<'a> {
     }
   }
 
+  pub fn return_val(&self) -> Option<&'a Ty<'a>> {
+    match self.kind {
+      TyKind::Func(param) | TyKind::Lambda(param) | TyKind::Length(param) => {
+        match param[0].kind {
+          TyKind::Void => None,
+          _ => Some(&param[0])
+        }
+      }
+      _ => None
+    }
+  }
+
   // why don't use const items?
   // it seems that const items can only have type Ty<'static>, which can NOT be casted to Ty<'a>
   pub const fn error() -> Ty<'a> { Ty::new(TyKind::Error) }
@@ -100,6 +112,7 @@ impl<'a> Ty<'a> {
   pub fn is_func(&self) -> bool { self.arr == 0 && if let TyKind::Func(_) = self.kind { true } else { false } }
   pub fn is_class(&self) -> bool { self.arr == 0 && if let TyKind::Class(_) = self.kind { true } else { false } }
   pub fn is_object(&self) -> bool { self.arr == 0 && if let TyKind::Object(_) = self.kind { true } else { false } }
+  pub fn is_func_or_lambda(&self) -> bool { self.arr == 0 && ( if let TyKind::Func(_) = self.kind { true } else { false } || if let TyKind::Lambda(_) = self.kind { true } else { false } )}
 }
 
 impl fmt::Debug for Ty<'_> {

@@ -1,5 +1,5 @@
 use crate::{ty::*, symbol::*};
-use common::{Loc, Ref, BinOp, UnOp};
+use common::{Loc, Ref, BinOp, UnOp, IndexSet};
 use typed_arena::Arena;
 use std::cell::{Cell, RefCell};
 
@@ -97,6 +97,8 @@ pub struct VarDef<'a> {
   pub ty: Cell<Ty<'a>>,
   pub owner: Cell<Option<ScopeOwner<'a>>>,
   pub finish_loc: Loc,
+  pub cur: Cell<Option<&'a Expr<'a>>>,
+  pub reg: Cell<u32>,
 }
 
 impl<'a> VarDef<'a> {
@@ -189,7 +191,6 @@ pub struct VarSel<'a> {
   pub name: &'a str,
   pub var: Cell<Option<&'a VarDef<'a>>>,
   pub func: Cell<Option<&'a FuncDef<'a>>>,
-  pub lambda: Cell<Option<&'a Lambda<'a>>>,
 }
 
 pub struct IndexSel<'a> {
@@ -245,11 +246,21 @@ pub struct Lambda<'a> {
   pub param: Vec<&'a VarDef<'a>>,
   pub body: LambdaBody<'a>,
   pub name: String,
+  // TODO: probably not usable
+//  pub captured_vars: Vec<&'a VarSel<'a>>,
+  pub this: Cell<Option<&'a ClassDef<'a>>>,
+  pub captured_vars: RefCell<Vec<&'a VarDef<'a>>>,
   // Same as FuncDef
   pub ret_param_ty: Cell<Option<&'a [Ty<'a>]>>,
   pub class: Cell<Option<&'a ClassDef<'a>>>,
   pub scope: RefCell<Scope<'a>>,
 }
+
+impl<'a> Lambda<'a> {
+  pub fn ret_ty(&self) -> Ty<'a> { self.ret_param_ty.get().unwrap()[0] }
+}
+//TODO: implement insert function for captured_vars
+
 
 // some unit struct, they exist just to make match pattern consistent(all patterns are like Xxx(x))
 pub struct Skip;

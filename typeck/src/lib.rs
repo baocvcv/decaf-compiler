@@ -3,7 +3,7 @@ mod symbol_pass;
 mod type_pass;
 
 use common::{Errors, ErrorKind::*, Ref};
-use syntax::{FuncDef, ClassDef, SynTy, SynTyKind, ScopeOwner, Ty, TyKind, Program};
+use syntax::{FuncDef, ClassDef, SynTy, SynTyKind, ScopeOwner, Ty, TyKind, Program, Lambda, VarDef};
 use typed_arena::Arena;
 use std::ops::{Deref, DerefMut};
 use crate::{symbol_pass::SymbolPass, type_pass::TypePass, scope_stack::ScopeStack};
@@ -12,10 +12,11 @@ use crate::{symbol_pass::SymbolPass, type_pass::TypePass, scope_stack::ScopeStac
 #[derive(Default)]
 pub struct TypeCkAlloc<'a> {
   pub ty: Arena<Ty<'a>>,
+  pub vec: Arena<&'a VarDef<'a>>,
 }
 
 pub fn work<'a>(p: &'a Program<'a>, alloc: &'a TypeCkAlloc<'a>) -> Result<(), Errors<'a, Ty<'a>>> {
-  let mut s = SymbolPass(TypeCk { errors: Errors(vec![]), scopes: ScopeStack::new(p), loop_cnt: 0, cur_used: false, cur_func: None, cur_class: None, alloc, lambda_cnt: 0 });
+  let mut s = SymbolPass(TypeCk { errors: Errors(vec![]), scopes: ScopeStack::new(p), loop_cnt: 0, cur_used: false, cur_func: None, cur_class: None, alloc, lambda_cnt: 0, lambda_stack: vec![] });
   s.program(p);
   if !s.errors.0.is_empty() { return Err(s.0.errors.sorted()); }
   let mut t = TypePass(s.0);
@@ -40,6 +41,8 @@ struct TypeCk<'a> {
   alloc: &'a TypeCkAlloc<'a>,
   // is in lambda
   lambda_cnt: u32,
+  // lambda stack
+  lambda_stack: Vec<&'a Lambda<'a>>,
 }
 
 impl<'a> TypeCk<'a> {
