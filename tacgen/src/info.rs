@@ -9,11 +9,6 @@ pub struct VarInfo {
   pub off: u32,
 }
 
-pub struct LambdaInfo {
-  // function id in TacProgram
-  pub idx: u32,
-}
-
 pub struct FuncInfo {
   // the offset in vtbl
   // vtbl[0] = parent, vtbl[1] = class name

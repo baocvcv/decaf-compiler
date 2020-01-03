@@ -1,26 +1,21 @@
-use crate::{ClassDef, FuncDef, Lambda};
+use crate::{ClassDef, FuncDef};
 use common::{Loc, Ref};
 use std::fmt;
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub enum SynTyKind<'a> {
   Int,
   Bool,
   String,
   Void,
-  Lambda,
-  Var,
   Named(&'a str),
 }
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct SynTy<'a> {
   pub loc: Loc,
   pub arr: u32,
   pub kind: SynTyKind<'a>,
-  //TODO: mark!
-  pub rt: Option<Box<SynTy<'a>>>,
-  pub tl: Vec<SynTy<'a>>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -37,10 +32,6 @@ pub enum TyKind<'a> {
   Class(Ref<'a, ClassDef<'a>>),
   // [0] = ret, [1..] = param
   Func(&'a [Ty<'a>]),
-  Lambda(&'a [Ty<'a>]),
-  Length(&'a [Ty<'a>]),
-  // undetermined
-  Var,
 }
 
 impl Default for TyKind<'_> {
@@ -67,29 +58,19 @@ impl<'a> Ty<'a> {
     use TyKind::*;
     match (self.kind, rhs.kind) {
       (Error, _) | (_, Error) => true,
-      _ => self.arr == rhs.arr && match (self.kind, rhs.kind) {
-        (Int, Int) | (Bool, Bool) | (String, String) | (Void, Void) => true,
-        (Object(c1), Object(Ref(c2))) | (Class(c1), Class(Ref(c2))) | (Class(c1), Object(Ref(c2))) | (Object(c1), Class(Ref(c2))) => c1.extends(c2),
-        (Null, Object(_)) | (Null, Class(_)) => true,
-        (Null, Null) => true,
-        (Func(rp1), Func(rp2)) | (Func(rp1), Lambda(rp2)) | (Lambda(rp1), Func(rp2)) | (Lambda(rp1), Lambda(rp2)) | (Length(rp1), Length(rp2)) | (Length(rp1), Lambda(rp2)) | (Length(rp1), Func(rp2)) | (Func(rp1), Length(rp2)) | (Lambda(rp1), Length(rp2)) => {
-          let (r1, p1, r2, p2) = (&rp1[0], &rp1[1..], &rp2[0], &rp2[1..]);
-          r1.assignable_to(*r2) && p1.len() == p2.len() && p1.iter().zip(p2.iter()).all(|(p1, p2)| p2.assignable_to(*p1))
-        },
-        _ => false,
-      }
-    }
-  }
-
-  pub fn return_val(&self) -> Option<&'a Ty<'a>> {
-    match self.kind {
-      TyKind::Func(param) | TyKind::Lambda(param) | TyKind::Length(param) => {
-        match param[0].kind {
-          TyKind::Void => None,
-          _ => Some(&param[0])
+      _ if self.arr == rhs.arr => if self.arr == 0 {
+        match (self.kind, rhs.kind) {
+          (Int, Int) | (Bool, Bool) | (String, String) | (Void, Void) => true,
+          (Object(c1), Object(Ref(c2))) => c1.extends(c2),
+          (Null, Object(_)) => true,
+          (Func(rp1), Func(rp2)) => {
+            let (r1, p1, r2, p2) = (&rp1[0], &rp1[1..], &rp2[0], &rp2[1..]);
+            r1.assignable_to(*r2) && p1.len() == p2.len() && p1.iter().zip(p2.iter()).all(|(p1, p2)| p2.assignable_to(*p1))
+          }
+          _ => false,
         }
-      }
-      _ => None
+      } else { *self == rhs }
+      _ => false,
     }
   }
 
@@ -105,14 +86,12 @@ impl<'a> Ty<'a> {
   pub fn mk_obj(c: &'a ClassDef<'a>) -> Ty<'a> { Ty::new(TyKind::Object(Ref(c))) }
   pub fn mk_class(c: &'a ClassDef<'a>) -> Ty<'a> { Ty::new(TyKind::Class(Ref(c))) }
   pub fn mk_func(f: &'a FuncDef<'a>) -> Ty<'a> { Ty::new(TyKind::Func(f.ret_param_ty.get().unwrap())) }
-  pub fn mk_lambda(f: &'a Lambda<'a>) -> Ty<'a> { Ty::new(TyKind::Lambda(f.ret_param_ty.get().unwrap())) }
 
   // if you want something like `is_void()`, just use `== Ty::void()`
   pub fn is_arr(&self) -> bool { self.arr > 0 }
   pub fn is_func(&self) -> bool { self.arr == 0 && if let TyKind::Func(_) = self.kind { true } else { false } }
   pub fn is_class(&self) -> bool { self.arr == 0 && if let TyKind::Class(_) = self.kind { true } else { false } }
   pub fn is_object(&self) -> bool { self.arr == 0 && if let TyKind::Object(_) = self.kind { true } else { false } }
-  pub fn is_func_or_lambda(&self) -> bool { self.arr == 0 && ( if let TyKind::Func(_) = self.kind { true } else { false } || if let TyKind::Lambda(_) = self.kind { true } else { false } )}
 }
 
 impl fmt::Debug for Ty<'_> {
@@ -128,7 +107,7 @@ impl fmt::Debug for Ty<'_> {
       // the printing format may be different from other experiment framework's
       // it is not because their format is hard to implement in rust, but because I simply don't like their format,
       // which introduces unnecessary complexity, and doesn't increase readability
-      TyKind::Func(ret_param) | TyKind::Lambda(ret_param) | TyKind::Length(ret_param) => {
+      TyKind::Func(ret_param) => {
         let (ret, param) = (ret_param[0], &ret_param[1..]);
         write!(f, "{:?}(", ret)?;
         for (idx, p) in param.iter().enumerate() {
@@ -136,7 +115,6 @@ impl fmt::Debug for Ty<'_> {
         }
         write!(f, ")")
       }
-      TyKind::Var => write!(f, "var"),
     }?;
     for _ in 0..self.arr { write!(f, "[]")?; }
     Ok(())

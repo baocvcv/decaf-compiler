@@ -37,10 +37,9 @@ pub fn write_tac(t: Tac, pr: &TacProgram, p: &mut IndentPrinter) {
     Assign { dst, src } => write!(p, "%{} = {:?}", dst, src[0]),
     Param { src } => write!(p, "parm {:?}", src[0]),
     Call { dst, kind, } => write!(p, "{}call {}", dst.map(|dst| format!("%{} = ", dst)).unwrap_or(String::new()), match kind {
-      //TODO: not right
-      CallKind::Virtual(fp, _) | CallKind::Lambda(fp, _) => format!("{:?}", fp[0]),
+      CallKind::Virtual(fp, _) => format!("{:?}", fp[0]),
       CallKind::Static(f, _) => pr.func[f as usize].name.clone(),
-      CallKind::Intrinsic(i) => i.name().to_owned(),
+      CallKind::Intrinsic(i) => format!("{:?}", i),
     }),
     Ret { src } => if let Some(src) = src { write!(p, "return {:?}", src[0]) } else { write!(p, "return") },
     Jmp { label } => write!(p, "branch %{}", label),

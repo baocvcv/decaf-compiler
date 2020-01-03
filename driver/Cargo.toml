@@ -11,6 +11,8 @@ syntax = { path = "../syntax" }
 typeck = { path = "../typeck" }
 tac = { path = "../tac" }
 tacgen = { path = "../tacgen" }
+tacopt = { path = "../tacopt" }
+codegen = { path = "../codegen" }
 typed-arena = "1.4.1"
 tacvm = { git = "https://github.com/MashPlant/tacvm" }
 colored = "1.8"

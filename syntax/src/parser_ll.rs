@@ -19,7 +19,6 @@ pub struct Parser<'p> {
 
 impl<'p> Parser<'p> {
   fn error(&mut self, token: &Token<'p>, lexer_loc: Loc) {
-//    println!("Received error {:?} {:?}", token, lexer_loc);
     let loc = token.loc();
     match token.ty {
       TokenKind::_Err => if self.error.0.last().map(|x| x.0) != Some(loc) {
@@ -29,11 +28,7 @@ impl<'p> Parser<'p> {
         check_str(token.str(), &mut self.error, loc);
         self.error.issue(lexer_loc, ErrorKind::SyntaxError)
       }
-//      TokenKind::_Eof => if self.error.0.last().map(|x| x.0) != Some(Loc(loc.0, loc.1 + 1)) {
-//        self.error.issue(Loc(loc.0, loc.1 + 1), ErrorKind::SyntaxError)
-//      }
       _ => if self.error.0.last().map(|x| x.0) != Some(loc) {
-//        println!("Issued error {:?} {:?}", token, lexer_loc);
         self.error.issue(loc, ErrorKind::SyntaxError)
       }
     }
@@ -47,32 +42,13 @@ impl<'p> Parser<'p> {
     let table: &[HashMap<u32, (u32, Vec<u32>)>] = &*TABLE;
     let is_nt = |x: u32| x < NT_NUM;
 
-    // For debug
-//    print!("target: {} lookahead: {}@{:?} ", target, lookahead.ty as u32, lookahead.loc());
-
     let mut end = f.clone();
     end.extend(follow[target].iter());
     let table = &table[target];
     let (prod, rhs) = if let Some(x) = table.get(&(lookahead.ty as u32)) { x } else {
       self.error(lookahead, lexer.loc());
-//      println!("{:?}", table);
-      let ret = loop {
-        if let Some(x) = table.get(&(lookahead.ty as u32)) {
-//          println!("In begin {}, {:?} at {:?}", lookahead.ty as u32, x, lexer.loc());
-          break x
-        } else if let Some(_x) = end.get(&(lookahead.ty as u32)) {
-//          println!();
-//          println!("In End {} at {:?}", lookahead.ty as u32, lexer.loc());
-          lexer.line = lookahead.loc().0;
-          lexer.col = lookahead.loc().1;
-          return StackItem::_Fail
-        }
-        *lookahead = lexer.next();
-      };
-      ret
+      unimplemented!()
     };
-    // for debug
-//    println!(" P({}) {:?}", prod, rhs);
     let value_stk = rhs.iter().map(|&x| {
       if is_nt(x) {
         self._parse(x, lookahead, lexer, &end)
@@ -81,7 +57,6 @@ impl<'p> Parser<'p> {
         *lookahead = lexer.next();
         StackItem::_Token(token)
       } else {
-//        println!("Cannot parse {} at {:?}", lookahead.ty as u32, lexer.loc());
         self.error(lookahead, lexer.loc());
         StackItem::_Fail
       }
@@ -99,7 +74,6 @@ impl Lexer<'_> {
   pub fn loc(&self) -> Loc { Loc(self.line, self.col) }
 }
 
-type TypeTerm<'p> = (Vec<SynTy<'p>>, u32);
 type Terms<'p> = Vec<(Expr<'p>, (Loc, BinOp))>;
 
 fn merge_terms<'p>(mut l: Expr<'p>, ts: Terms<'p>) -> Expr<'p> {
@@ -116,8 +90,7 @@ fn merge_idx_id_call<'p>(mut l: Expr<'p>, ts: Vec<IndexOrIdOrCall<'p>>) -> Expr<
         l = mk_expr(loc, IndexSel { arr: Box::new(l), idx: Box::new(idx) }.into()),
       IndexOrIdOrCall::IdOrCall(loc, name, maybe_call) => match maybe_call {
         Some((call_loc, arg)) => {
-//          let func = Box::new(mk_expr(loc, VarSel { owner: Some(Box::new(l)), name, var: dft() }.into()));
-          let func = Box::new(l);
+          let func = Box::new(mk_expr(loc, VarSel { owner: Some(Box::new(l)), name, var: dft() }.into()));
           l = mk_expr(call_loc, Call { func, arg, func_ref: dft() }.into());
         }
         None => l = mk_expr(loc, VarSel { owner: Some(Box::new(l)), name, var: dft() }.into()),
@@ -138,18 +111,7 @@ pub enum NewClassOrArray<'p> {
   NewArray(SynTy<'p>, Expr<'p>),
 }
 
-pub enum ExprOrBlock<'p> {
-  Expr(Expr<'p>),
-  Block(Block<'p>),
-}
-
-pub enum DimOrTypeList<'p> {
-  Dim(u32),
-  TypeList(Vec<SynTy<'p>>),
-}
-
 #[ll1(Program)]
-//#[verbose("verbose.txt")]
 #[lex(r##"
 priority = []
 
@@ -176,12 +138,6 @@ priority = []
 'ReadLine' = 'ReadLine'
 'static' = 'Static'
 'instanceof' = 'InstanceOf'
-'static' = 'Static'
-'instanceof' = 'InstanceOf'
-'abstract' = 'Abstract'
-'var' = 'Var'
-'fun' = 'Func'
-'=>' = 'To'
 '<=' = 'Le'
 '>=' = 'Ge'
 '==' = 'Eq'
@@ -230,14 +186,9 @@ impl<'p> Parser<'p> {
   #[rule(ClassList ->)]
   fn class_list1() -> Vec<&'p ClassDef<'p>> { vec![] }
 
-  //TODO: check this
-  #[rule(ClassDef -> Abstract Class Id MaybeExtends LBrc FieldList RBrc)]
-  fn class_def1(&self, _a: Token, c: Token, name: Token, parent: Option<&'p str>, _l: Token, field: Vec<FieldDef<'p>>, _r: Token) -> &'p ClassDef<'p> {
-    self.alloc.class.alloc(ClassDef { loc: c.loc(), abstract_: true, name: name.str(), parent, field: field.reversed(), parent_ref: dft(), scope: dft() })
-  }
   #[rule(ClassDef -> Class Id MaybeExtends LBrc FieldList RBrc)]
   fn class_def(&self, c: Token, name: Token, parent: Option<&'p str>, _l: Token, field: Vec<FieldDef<'p>>, _r: Token) -> &'p ClassDef<'p> {
-    self.alloc.class.alloc(ClassDef { loc: c.loc(), name: name.str(), parent, abstract_: false, field: field.reversed(), parent_ref: dft(), scope: dft() })
+    self.alloc.class.alloc(ClassDef { loc: c.loc(), name: name.str(), parent, field: field.reversed(), parent_ref: dft(), scope: dft() })
   }
 
   #[rule(MaybeExtends -> Extends Id)]
@@ -250,22 +201,16 @@ impl<'p> Parser<'p> {
   #[rule(FieldList ->)]
   fn field_list0() -> Vec<FieldDef<'p>> { vec![] }
 
-  // TODO: check this
-  #[rule(FieldDef -> Abstract Type Id LPar VarDefListOrEmpty RPar Semi)]
-  fn filed_def_f2(&self, _a: Token, ret: SynTy<'p>, name: Token, _l: Token, param: Vec<&'p VarDef<'p>>, _r: Token, _s: Token) -> FieldDef<'p> {
-    let (loc, name) = (name.loc(), name.str());
-    FieldDef::FuncDef(self.alloc.func.alloc(FuncDef { loc, name, ret, param: param.reversed(), static_: false, abstract_: true, body: None, ret_param_ty: dft(), class: dft(), scope: dft() }))
-  }
   #[rule(FieldDef -> Static Type Id LPar VarDefListOrEmpty RPar Block)]
-  fn filed_def_f1(&self, _s: Token, ret: SynTy<'p>, name: Token, _l: Token, param: Vec<&'p VarDef<'p>>, _r: Token, body: Block<'p>) -> FieldDef<'p> {
+  fn field_def_f1(&self, _s: Token, ret: SynTy<'p>, name: Token, _l: Token, param: Vec<&'p VarDef<'p>>, _r: Token, body: Block<'p>) -> FieldDef<'p> {
     let (loc, name) = (name.loc(), name.str());
-    FieldDef::FuncDef(self.alloc.func.alloc(FuncDef { loc, name, ret, param: param.reversed(), static_: true, abstract_: false, body: Some(body), ret_param_ty: dft(), class: dft(), scope: dft() }))
+    FieldDef::FuncDef(self.alloc.func.alloc(FuncDef { loc, name, ret, param: param.reversed(), static_: true, body, ret_param_ty: dft(), class: dft(), scope: dft() }))
   }
   #[rule(FieldDef -> Type Id FuncOrVar)]
-  fn filed_def_fv(&self, syn_ty: SynTy<'p>, name: Token, fov: Option<(Vec<&'p VarDef<'p>>, Block<'p>)>) -> FieldDef<'p> {
+  fn field_def_fv(&self, syn_ty: SynTy<'p>, name: Token, fov: Option<(Vec<&'p VarDef<'p>>, Block<'p>)>) -> FieldDef<'p> {
     let (loc, name) = (name.loc(), name.str());
     if let Some((param, body)) = fov {
-      FieldDef::FuncDef(self.alloc.func.alloc(FuncDef { loc, name, ret: syn_ty, param: param.reversed(), static_: false, abstract_: false, body: Some(body), ret_param_ty: dft(), class: dft(), scope: dft() }))
+      FieldDef::FuncDef(self.alloc.func.alloc(FuncDef { loc, name, ret: syn_ty, param: param.reversed(), static_: false, body, ret_param_ty: dft(), class: dft(), scope: dft() }))
     } else {
       FieldDef::VarDef(self.alloc.var.alloc(VarDef { loc, name, syn_ty, init: None, ty: dft(), owner: dft() }))
     }
@@ -345,12 +290,6 @@ impl<'p> Parser<'p> {
       mk_stmt(e.loc, e.into())
     }
   }
-  //TODO: check
-  #[rule(Simple -> Var Id Assign Expr)]
-  fn simple_auto_var_def(&self, v: Token, name: Token, a: Token, init: Expr<'p>) -> Stmt<'p> {
-    let loc = name.loc();
-    mk_stmt(loc, (&*self.alloc.var.alloc(VarDef { loc, name: name.str(), syn_ty: SynTy { loc: v.loc(), arr: 0, kind: SynTyKind::Var, rt: None, tl: vec![] }, init: Some((a.loc(), init)), ty: dft(), owner: dft() })).into())
-  }
   #[rule(Simple -> Type Id MaybeAssign)]
   fn simple_var_def(&self, syn_ty: SynTy<'p>, name: Token, init: Option<(Loc, Expr<'p>)>) -> Stmt<'p> {
     let loc = name.loc();
@@ -418,24 +357,8 @@ impl<'p> Parser<'p> {
   #[rule(Op7 -> Not)]
   fn op7_not(n: Token) -> (Loc, UnOp) { (n.loc(), UnOp::Not) }
 
-  #[rule(Expr -> Expr0)] fn expr(e: Expr<'p>) -> Expr<'p> { e }
   #[rule(Expr -> Expr1)]
-  fn expr_0(e: Expr<'p>) -> Expr<'p> { e }
-
-  //TODO: check this
-  #[rule(Expr0 -> FuncParamList Term0OrBlock)]
-  fn expr0(fl: (Loc, Vec<&'p VarDef<'p>>), tb: ExprOrBlock<'p>) -> Expr<'p> {
-    match tb {
-      ExprOrBlock::Expr(e) => { mk_expr(fl.0, Lambda { loc: fl.0, param: fl.1.reversed(), body: LambdaBody { expr: Some(Box::new(e)), body: None } }.into()) },
-      ExprOrBlock::Block(b) => { mk_expr(fl.0, Lambda { loc: fl.0, param: fl.1.reversed(), body: LambdaBody { expr: None, body: Some(b) } }.into()) }
-    }
-  }
-  #[rule(Term0OrBlock -> To Expr)]
-  fn term0_or_block_1(_t: Token, e: Expr<'p>) -> ExprOrBlock<'p> { ExprOrBlock::Expr(e) }
-  #[rule(Term0OrBlock -> Block)]
-  fn term0_or_block_0(b: Block<'p>) -> ExprOrBlock<'p> { ExprOrBlock::Block(b) }
-  #[rule(FuncParamList -> Func LPar VarDefListOrEmpty RPar)]
-  fn func_param_list(f: Token, _l: Token, pa: Vec<&'p VarDef<'p>>, _r: Token) -> (Loc, Vec<&'p VarDef<'p>>) { (f.loc(), pa) }
+  fn expr(e: Expr<'p>) -> Expr<'p> { e }
 
   #[rule(Expr1 -> Expr2 Term1)]
   fn expr1(l: Expr<'p>, ts: Terms<'p>) -> Expr<'p> { merge_terms(l, ts) }
@@ -496,30 +419,19 @@ impl<'p> Parser<'p> {
     mk_expr(e.loc, ClassCast { name: name.str(), expr: Box::new(e), class: dft() }.into())
   }
 
-//  #[rule(G -> LPar ExprListOrEmpty RPar G)]
-//  fn g_1(_l: Token, arg: Vec<Expr<'p>>, _r: Token, )
-//  #[rule(G -> )]
-//  fn g_0() -> Vec<Expr<'p>> { vec![] }
-
   #[rule(Expr8 -> Expr9 Term8)]
   fn expr8(l: Expr<'p>, ts: Vec<IndexOrIdOrCall<'p>>) -> Expr<'p> { merge_idx_id_call(l, ts) }
 
-  #[rule(Term8 -> LBrk Expr RBrk Term8)] // lValue
+  #[rule(Term8 -> LBrk Expr RBrk Term8)]
   fn term8_index(l: Token, idx: Expr<'p>, _r: Token, r: Vec<IndexOrIdOrCall<'p>>) -> Vec<IndexOrIdOrCall<'p>> { r.pushed(IndexOrIdOrCall::Index(l.loc(), idx)) }
   #[rule(Term8 -> Dot Id IdOrCall Term8)]
-  fn term8_id(_d: Token, name: Token, arg: Option<(Loc, Vec<Expr<'p>>)>, r: Vec<IndexOrIdOrCall<'p>>) -> Vec<IndexOrIdOrCall<'p>> {
+  fn term8_id_or_call(_d: Token, name: Token, arg: Option<(Loc, Vec<Expr<'p>>)>, r: Vec<IndexOrIdOrCall<'p>>) -> Vec<IndexOrIdOrCall<'p>> {
     r.pushed(IndexOrIdOrCall::IdOrCall(name.loc(), name.str(), arg))
   }
-  //TODO: check!!!! this is hacked
-  #[rule(Term8 -> Call Term8)]
-  fn term8_call(arg: Option<(Loc, Vec<Expr<'p>>)>, r: Vec<IndexOrIdOrCall<'p>>) -> Vec<IndexOrIdOrCall<'p>> {
-    r.pushed(IndexOrIdOrCall::IdOrCall(Loc(0, 0), "none", arg))
-  }
-
   #[rule(Term8 ->)]
   fn term8_0() -> Vec<IndexOrIdOrCall<'p>> { vec![] }
 
-  #[rule(Call -> LPar ExprListOrEmpty RPar)]
+  #[rule(IdOrCall -> LPar ExprListOrEmpty RPar)]
   fn id_or_call_c(l: Token, arg: Vec<Expr<'p>>, _r: Token) -> Option<(Loc, Vec<Expr<'p>>)> { Some((l.loc(), arg.reversed())) }
   #[rule(IdOrCall ->)]
   fn id_or_call_i() -> Option<(Loc, Vec<Expr<'p>>)> { None }
@@ -583,59 +495,20 @@ impl<'p> Parser<'p> {
   fn new_array_rem0(len: Expr<'p>, _r: Token) -> (u32, Expr<'p>) { (0, len) }
 
   #[rule(SimpleType -> Int)]
-  fn type_int(i: Token) -> SynTy<'p> { SynTy { loc: i.loc(), arr: 0, kind: SynTyKind::Int, rt: None, tl: vec![] } }
+  fn type_int(i: Token) -> SynTy<'p> { SynTy { loc: i.loc(), arr: 0, kind: SynTyKind::Int } }
   #[rule(SimpleType -> Bool)]
-  fn type_bool(b: Token) -> SynTy<'p> { SynTy { loc: b.loc(), arr: 0, kind: SynTyKind::Bool, rt: None, tl: vec![] } }
+  fn type_bool(b: Token) -> SynTy<'p> { SynTy { loc: b.loc(), arr: 0, kind: SynTyKind::Bool } }
   #[rule(SimpleType -> Void)]
-  fn type_void(v: Token) -> SynTy<'p> { SynTy { loc: v.loc(), arr: 0, kind: SynTyKind::Void, rt: None, tl: vec![] } }
+  fn type_void(v: Token) -> SynTy<'p> { SynTy { loc: v.loc(), arr: 0, kind: SynTyKind::Void } }
   #[rule(SimpleType -> String)]
-  fn type_string(s: Token) -> SynTy<'p> { SynTy { loc: s.loc(), arr: 0, kind: SynTyKind::String, rt: None, tl: vec![] } }
+  fn type_string(s: Token) -> SynTy<'p> { SynTy { loc: s.loc(), arr: 0, kind: SynTyKind::String } }
   #[rule(SimpleType -> Class Id)]
-  fn type_class(c: Token, name: Token) -> SynTy<'p> { SynTy { loc: c.loc(), arr: 0, kind: SynTyKind::Named(name.str()), rt: None, tl: vec![] } }
-  //  #[rule(Type -> SimpleType ArrayDim)]
-  //  fn type_array(mut ty: SynTy<'p>, dim: u32) -> SynTy<'p> { (ty.arr = dim, ty).1 }
-  //  #[rule(Type -> SimpleType DimOrList)]
-  //  fn type_array_or_lambda(mut ty: SynTy<'p>, dl: DimOrTypeList<'p>) -> SynTy<'p> {
-  //    match dl {
-  //      DimOrTypeList::Dim(dim) => { (ty.arr = dim, ty).1 },
-  //      DimOrTypeList::TypeList(l) => { SynTy { loc: ty.loc, arr: 0, kind: SynTyKind::Lambda, rt: Some(Box::new(ty)), tl: l.reversed() } }
-  //    }
-  //  }
-  //  #[rule(DimOrList -> ArrayDim)]
-  //  fn dim_or_list1(dim: u32) -> DimOrTypeList<'p> { DimOrTypeList::Dim(dim) }
-  //  #[rule(DimOrList -> LPar TypeListOrEmpty RPar)]
-  //  fn dim_or_list0(_l: Token, tl: Vec<SynTy<'p>>, _r: Token) -> DimOrTypeList<'p> { DimOrTypeList::TypeList(tl) }
-  #[rule(Type -> SimpleType ArrayDim TypeListsOrEmpty)]
-  fn type_array_or_lambda(mut ty: SynTy<'p>, dim: u32, te: Vec<TypeTerm<'p>>) -> SynTy<'p> {
-    ty.arr = dim;
-    if te.is_empty() {
-      ty
-    } else {
-      for tl in te.iter().rev() {
-        let mut tl_new = tl.0.to_vec();
-        ty = SynTy { loc: ty.loc, arr: tl.1, kind: SynTyKind::Lambda, rt: Some(Box::new(ty)), tl: tl_new.reversed() }
-      }
-      ty
-    }
-  }
-  #[rule(TypeListsOrEmpty -> LPar TypeListOrEmpty RPar ArrayDim TypeListsOrEmpty)]
-  fn type_lists_or_empty1(_l: Token, te: Vec<SynTy<'p>>, _r: Token, dim: u32, tse: Vec<TypeTerm<'p>>) -> Vec<TypeTerm<'p>> { tse.pushed((te, dim)) }
-  #[rule(TypeListsOrEmpty -> )]
-  fn type_lists_or_empty0() -> Vec<TypeTerm<'p>> { vec![] }
+  fn type_class(c: Token, name: Token) -> SynTy<'p> { SynTy { loc: c.loc(), arr: 0, kind: SynTyKind::Named(name.str()) } }
+  #[rule(Type -> SimpleType ArrayDim)]
+  fn type_array(mut ty: SynTy<'p>, dim: u32) -> SynTy<'p> { (ty.arr = dim, ty).1 }
 
   #[rule(ArrayDim -> LBrk RBrk ArrayDim)]
   fn array_type(l: Token, _r: Token, dim: u32) -> u32 { dim + 1 }
   #[rule(ArrayDim ->)]
   fn array_type0() -> u32 { 0 }
-
-  #[rule(TypeListOrEmpty -> TypeList)]
-  fn type_list_or_empty1(l: Vec<SynTy<'p>>) -> Vec<SynTy<'p>> { l }
-  #[rule(TypeListOrEmpty -> )]
-  fn type_list_or_empty0() -> Vec<SynTy<'p>> { vec![] }
-  #[rule(TypeList -> Type TypeListRem)]
-  fn type_list(l: SynTy<'p>, r: Vec<SynTy<'p>>) -> Vec<SynTy<'p>> { r.pushed(l) }
-  #[rule(TypeListRem -> Comma Type TypeListRem)]
-  fn type_list_rem1(_c: Token, l: SynTy<'p>, r: Vec<SynTy<'p>>) -> Vec<SynTy<'p>> { r.pushed(l) }
-  #[rule(TypeListRem -> )]
-  fn type_list_rem0() -> Vec<SynTy<'p>> { vec![] }
 }

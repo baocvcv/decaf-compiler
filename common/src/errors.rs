@@ -71,14 +71,6 @@ pub enum ErrorKind<'a, Ty> {
   IndexNotArray,
   IndexNotInt,
   NoReturn,
-  CannotBeAbstract(&'a str),
-  CannotNewAbstract(&'a str),
-  ArgumentCannotBeVoid,
-  NoAssignLambda,
-  BadReturnInBlock,
-  NotCallable { var: Ty },
-  LambdaArgcMismatch { expect: u32, actual: u32 },
-  NoAssignMemberMethod(&'a str),
 }
 
 impl<Ty: fmt::Debug> fmt::Debug for ErrorKind<'_, Ty> {
@@ -120,14 +112,6 @@ impl<Ty: fmt::Debug> fmt::Debug for ErrorKind<'_, Ty> {
       IndexNotArray => write!(f, "[] can only be applied to arrays"),
       IndexNotInt => write!(f, "array subscript must be an integer"),
       NoReturn => write!(f, "missing return statement: control reaches end of non-void block"),
-      CannotBeAbstract(name) => write!(f, "'{}' is not abstract and does not override all abstract methods", name),
-      CannotNewAbstract(name) => write!(f, "cannot instantiate abstract class '{}'", name),
-      ArgumentCannotBeVoid => write!(f, "arguments in function type must be non-void known type"),
-      NoAssignLambda => write!(f, "cannot assign value to captured variables in lambda expression"),
-      BadReturnInBlock => write!(f, "incompatible return types in blocked expression"),
-      NotCallable { var} => write!(f, "{:?} is not a callable type", var),
-      LambdaArgcMismatch {expect, actual } => write!(f, "lambda expression expects {} argument(s) but {} given", expect, actual),
-      NoAssignMemberMethod(name) => write!(f, "cannot assign value to class member method '{}'", name),
     }
   }
 }

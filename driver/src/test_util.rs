@@ -1,4 +1,4 @@
-use std::{io::{self, BufReader, BufWriter}, fs::{self, File}, fmt, panic, path::{Path, PathBuf}, any::Any, sync::{Arc, Mutex}, process::{Command, Stdio}};
+use std::{io::{self, BufReader}, fs::{self, File}, fmt, panic, path::{Path, PathBuf}, any::Any, sync::{Arc, Mutex}, process::{Command, Stdio}};
 use colored::*;
 use crate::{CompileCfg, Parser, Stage, Alloc};
 
@@ -74,16 +74,11 @@ pub fn run(i: impl AsRef<Path>, o: impl AsRef<Path>, pa: Pa) -> io::Result<Strin
     Ok(p) => match cfg.stage {
       Stage::Parse | Stage::TypeCk => (fs::write(o, &p), p).1,
       Stage::Tac | Stage::TacOpt => {
-        let (tac, out) = if cfg.stage == Stage::Tac {
-          (o.with_extension("tac"), o.to_path_buf())
-        } else {
-          (o.to_path_buf(), o.with_extension("output")) // in pa4 we compare tac as result
-        };
-        fs::write(tac, &p)?;
+        fs::write(o.with_extension("tac"), &p)?;
         tacvm::work(&p, 100_000, 1000, true, true,
                     Box::new(BufReader::new(io::stdin())),
-                    Box::new(BufWriter::new(File::create(&out)?)),
-                    Box::new(BufWriter::new(File::create(o.with_extension("info"))?)),
+                    Box::new(File::create(&o)?),
+                    Box::new(File::create(o.with_extension("info"))?),
         )?;
         fs::read_to_string(o)?
       }

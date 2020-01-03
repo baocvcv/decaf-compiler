@@ -1,5 +1,5 @@
 use crate::{ty::*, symbol::*};
-use common::{Loc, Ref, BinOp, UnOp, IndexSet};
+use common::{Loc, Ref, BinOp, UnOp};
 use typed_arena::Arena;
 use std::cell::{Cell, RefCell};
 
@@ -23,7 +23,6 @@ pub struct Program<'a> {
 pub struct ClassDef<'a> {
   pub loc: Loc,
   pub name: &'a str,
-  pub abstract_: bool,
   pub parent: Option<&'a str>,
   pub field: Vec<FieldDef<'a>>,
   pub parent_ref: Cell<Option<&'a ClassDef<'a>>>,
@@ -72,8 +71,7 @@ pub struct FuncDef<'a> {
   pub ret: SynTy<'a>,
   pub param: Vec<&'a VarDef<'a>>,
   pub static_: bool,
-  pub abstract_: bool,
-  pub body: Option<Block<'a>>,
+  pub body: Block<'a>,
   // placing ret and param ty in one slice is mainly to some space, especially the size of struct Ty
   // [0] is ret_ty, [1..] is parm_ty
   pub ret_param_ty: Cell<Option<&'a [Ty<'a>]>>,
@@ -86,7 +84,6 @@ impl<'a> FuncDef<'a> {
   pub fn ret_ty(&self) -> Ty<'a> { self.ret_param_ty.get().unwrap()[0] }
 }
 
-
 pub struct VarDef<'a> {
   pub loc: Loc,
   pub name: &'a str,
@@ -96,9 +93,6 @@ pub struct VarDef<'a> {
   pub init: Option<(Loc, Expr<'a>)>,
   pub ty: Cell<Ty<'a>>,
   pub owner: Cell<Option<ScopeOwner<'a>>>,
-  pub finish_loc: Loc,
-  pub cur: Cell<Option<&'a Expr<'a>>>,
-  pub reg: Cell<u32>,
 }
 
 impl<'a> VarDef<'a> {
@@ -136,14 +130,12 @@ pub struct Block<'a> {
   pub loc: Loc,
   pub stmt: Vec<Stmt<'a>>,
   pub scope: RefCell<Scope<'a>>,
-  pub ret_ty: Cell<Ty<'a>>,
 }
 
 pub struct If<'a> {
   pub cond: Expr<'a>,
   pub on_true: Block<'a>,
   pub on_false: Option<Block<'a>>,
-  pub ret_ty: Cell<Ty<'a>>,
 }
 
 pub struct While<'a> {
@@ -162,7 +154,6 @@ pub struct Expr<'a> {
   pub loc: Loc,
   pub ty: Cell<Ty<'a>>,
   pub kind: ExprKind<'a>,
-  pub scope: RefCell<Scope<'a>>,
 }
 
 #[derive(derive_more::From)]
@@ -183,14 +174,12 @@ pub enum ExprKind<'a> {
   NewArray(NewArray<'a>),
   ClassTest(ClassTest<'a>),
   ClassCast(ClassCast<'a>),
-  Lambda(Lambda<'a>),
 }
 
 pub struct VarSel<'a> {
   pub owner: Option<Box<Expr<'a>>>,
   pub name: &'a str,
   pub var: Cell<Option<&'a VarDef<'a>>>,
-  pub func: Cell<Option<&'a FuncDef<'a>>>,
 }
 
 pub struct IndexSel<'a> {
@@ -203,9 +192,7 @@ pub struct Call<'a> {
   // hint: there are 2 places using `func` as VarSel, and there are 2 unimplemented!() respectively
   pub func: Box<Expr<'a>>,
   pub arg: Vec<Expr<'a>>,
-  //TODO: may need to change
   pub func_ref: Cell<Option<&'a FuncDef<'a>>>,
-  pub lambda_ref: Cell<Option<&'a Lambda<'a>>>,
 }
 
 pub struct Binary<'a> {
@@ -241,27 +228,6 @@ pub struct ClassCast<'a> {
   pub class: Cell<Option<&'a ClassDef<'a>>>,
 }
 
-pub struct Lambda<'a> {
-  pub loc: Loc,
-  pub param: Vec<&'a VarDef<'a>>,
-  pub body: LambdaBody<'a>,
-  pub name: String,
-  // TODO: probably not usable
-//  pub captured_vars: Vec<&'a VarSel<'a>>,
-  pub this: Cell<Option<&'a ClassDef<'a>>>,
-  pub captured_vars: RefCell<Vec<&'a VarDef<'a>>>,
-  // Same as FuncDef
-  pub ret_param_ty: Cell<Option<&'a [Ty<'a>]>>,
-  pub class: Cell<Option<&'a ClassDef<'a>>>,
-  pub scope: RefCell<Scope<'a>>,
-}
-
-impl<'a> Lambda<'a> {
-  pub fn ret_ty(&self) -> Ty<'a> { self.ret_param_ty.get().unwrap()[0] }
-}
-//TODO: implement insert function for captured_vars
-
-
 // some unit struct, they exist just to make match pattern consistent(all patterns are like Xxx(x))
 pub struct Skip;
 
@@ -274,8 +240,3 @@ pub struct This;
 pub struct ReadInt;
 
 pub struct ReadLine;
-
-pub struct LambdaBody<'a> {
-  pub expr: Option<Box<Expr<'a>>>,
-  pub body: Option<Block<'a>>,
-}

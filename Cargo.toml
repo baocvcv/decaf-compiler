@@ -6,9 +6,11 @@ members = [
   "print",
   "syntax",
   "typeck",
-  "driver",
   "tac",
   "tacgen",
+  "tacopt",
+  "codegen",
+  "driver",
 ]
 
 [profile.dev.overrides."*"]

@@ -51,17 +51,9 @@ impl Printable for SynTy<'_> {
       SynTyKind::Bool => write!(p, "TBool @ {:?}", self.loc).ignore(),
       SynTyKind::String => write!(p, "TString @ {:?}", self.loc).ignore(),
       SynTyKind::Void => write!(p, "TVoid @ {:?}", self.loc).ignore(),
-      SynTyKind::Var =>  write!(p, "<none>").ignore(),
       SynTyKind::Named(c) => {
         write!(p, "TClass @ {:?}", self.loc).ignore();
         p.indent(|p| c.print(p));
-      }
-      SynTyKind::Lambda => {
-        write!(p, "TLambda @ {:?}", self.loc).ignore();
-        p.indent(|p| {
-            self.rt.print(p);
-            self.tl.print(p);
-        })
       }
     }
     for _ in 0..self.arr { p.dec(); }
@@ -96,21 +88,9 @@ macro_rules! print_enum {
 
 // self.class[0] must be valid, because parser requires their are at least one class
 print_struct!(Program<'_>, self, self.class[0].loc, TopLevel, self.class);
-//print_struct!(ClassDef<'_>, self, self.loc, ClassDef, self.name self.parent self.field);
+print_struct!(ClassDef<'_>, self, self.loc, ClassDef, self.name self.parent self.field);
 print_struct!(VarDef<'_>, self, self.loc, LocalVarDef, self.syn_ty self.name self.init());
 print_struct!(Block<'_>, self, self.loc, Block, self.stmt);
-
-impl Printable for ClassDef<'_> {
-  fn print(&self, p: &mut IndentPrinter) {
-    write!(p, "ClassDef @ {:?}", self.loc).ignore();
-    p.indent(|p| {
-      if self.abstract_ { "ABSTRACT".print(p); }
-      self.name.print(p);
-      self.parent.print(p);
-      self.field.print(p);
-    })
-  }
-}
 
 impl Printable for FieldDef<'_> {
   fn print(&self, p: &mut IndentPrinter) {
@@ -127,7 +107,6 @@ impl Printable for FieldDef<'_> {
         write!(p, "MethodDef @ {:?}", f.loc).ignore();
         p.indent(|p| {
           if f.static_ { "STATIC".print(p); }
-          else if f.abstract_ { "ABSTRACT".print(p); }
           f.name.print(p);
           f.ret.print(p);
           f.param.print(p);
@@ -157,21 +136,7 @@ impl Printable for Expr<'_> {
       VarSel => x.owner x.name, IndexSel => x.arr x.idx, IntLit => x, BoolLit => x, StringLit => "\"".to_owned() + x + "\"",
       NullLit => , Call => x.func x.arg, Unary => x.op.to_word_str() x.r, Binary => x.op.to_word_str() x.l x.r,
       This => , ReadInt => , ReadLine => , NewClass => x.name, NewArray => x.elem x.len, ClassTest => x.expr x.name,
-      ClassCast => x.expr x.name, Lambda => x.param x.body
+      ClassCast => x.expr x.name
     );
   }
 }
-
-impl Printable for LambdaBody<'_> {
-  fn print(&self, p: &mut IndentPrinter) {
-      match self.expr {
-        None => (),
-        _ => self.expr.print(p),
-      }
-      match self.body {
-        None => (),
-        _ => self.body.print(p),
-      }
-  }
-}
-

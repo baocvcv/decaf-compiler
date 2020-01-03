@@ -126,8 +126,7 @@ impl Tac {
 #[derive(Copy, Clone)]
 pub enum CallKind {
   Virtual([Operand; 1], CallHint),
-  Lambda([Operand; 1], CallHint),
-  // the index of func in TacProgram, can be static OR NEW TODO: ????
+  // the index of func in TacProgram, can be static OR NEW
   Static(u32, CallHint),
   Intrinsic(Intrinsic),
 }
@@ -141,12 +140,10 @@ impl Debug for Operand {
   }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, strum_macros::IntoStaticStr)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Intrinsic { _Alloc, _ReadLine, _ReadInt, _StringEqual, _PrintInt, _PrintString, _PrintBool, _Halt }
 
 impl Intrinsic {
-  pub fn name(self) -> &'static str { self.into() } // `into` provided by strum_macros::IntoStaticStr
-
   pub fn has_ret(self) -> bool {
     use Intrinsic::*;
     match self { _Alloc | _ReadLine | _ReadInt | _StringEqual => true, _PrintInt | _PrintString | _PrintBool | _Halt => false }
@@ -166,7 +163,6 @@ pub const INT_SIZE: i32 = 4;
 
 pub const INDEX_OUT_OF_BOUND: &str = r#"Decaf runtime error: Array subscript out of bounds\n"#;
 pub const NEW_ARR_NEG: &str = r#"Decaf runtime error: Cannot create negative-sized array\n"#;
-pub const DIV_BY_0: &str = r#"Decaf runtime error: Division by zero error\n"#;
 pub const BAD_CAST1: &str = r#"Decaf runtime error: "#;
 pub const BAD_CAST2: &str = r#" cannot be cast to "#;
 pub const BAD_CAST3: &str = r#"\n"#;

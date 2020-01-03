@@ -3,7 +3,7 @@ mod symbol_pass;
 mod type_pass;
 
 use common::{Errors, ErrorKind::*, Ref};
-use syntax::{FuncDef, ClassDef, SynTy, SynTyKind, ScopeOwner, Ty, TyKind, Program, Lambda, VarDef};
+use syntax::{FuncDef, ClassDef, SynTy, SynTyKind, ScopeOwner, Ty, TyKind, Program, VarDef};
 use typed_arena::Arena;
 use std::ops::{Deref, DerefMut};
 use crate::{symbol_pass::SymbolPass, type_pass::TypePass, scope_stack::ScopeStack};
@@ -12,11 +12,10 @@ use crate::{symbol_pass::SymbolPass, type_pass::TypePass, scope_stack::ScopeStac
 #[derive(Default)]
 pub struct TypeCkAlloc<'a> {
   pub ty: Arena<Ty<'a>>,
-  pub vec: Arena<&'a VarDef<'a>>,
 }
 
 pub fn work<'a>(p: &'a Program<'a>, alloc: &'a TypeCkAlloc<'a>) -> Result<(), Errors<'a, Ty<'a>>> {
-  let mut s = SymbolPass(TypeCk { errors: Errors(vec![]), scopes: ScopeStack::new(p), loop_cnt: 0, cur_used: false, cur_func: None, cur_class: None, alloc, lambda_cnt: 0, lambda_stack: vec![] });
+  let mut s = SymbolPass(TypeCk { errors: Errors(vec![]), scopes: ScopeStack::new(p), loop_cnt: 0, cur_used: false, cur_func: None, cur_class: None, cur_var_def: None, alloc });
   s.program(p);
   if !s.errors.0.is_empty() { return Err(s.0.errors.sorted()); }
   let mut t = TypePass(s.0);
@@ -37,17 +36,13 @@ struct TypeCk<'a> {
   // actually only use cur_var_def's loc
   // if cur_var_def is Some, will use it's loc to search for symbol in TypePass::var_sel
   // this can reject code like `int a = a;`
-//  cur_var_def: Option<&'a VarDef<'a>>,
+  cur_var_def: Option<&'a VarDef<'a>>,
   alloc: &'a TypeCkAlloc<'a>,
-  // is in lambda
-  lambda_cnt: u32,
-  // lambda stack
-  lambda_stack: Vec<&'a Lambda<'a>>,
 }
 
 impl<'a> TypeCk<'a> {
   // is_arr can be helpful if you want the type of array while only having its element type (to avoid cloning other fields)
-  fn ty(&mut self, s: &'a SynTy<'a>, is_arr: bool) -> Ty<'a> {
+  fn ty(&mut self, s: &SynTy<'a>, is_arr: bool) -> Ty<'a> {
     let kind = match &s.kind {
       SynTyKind::Int => TyKind::Int,
       SynTyKind::Bool => TyKind::Bool,
@@ -56,29 +51,12 @@ impl<'a> TypeCk<'a> {
       SynTyKind::Named(name) => if let Some(c) = self.scopes.lookup_class(name) {
         TyKind::Object(Ref(c))
       } else { self.issue(s.loc, NoSuchClass(name)) },
-      // TODO: update this
-      SynTyKind::Lambda => { TyKind::Lambda(self.parse_lambda_type(s)) }, // only temporary
-      SynTyKind::Var => TyKind::Error,
     };
     match kind {
       TyKind::Error => Ty::error(),
       TyKind::Void if s.arr != 0 => self.issue(s.loc, VoidArrayElement),
       _ => Ty { arr: s.arr + (is_arr as u32), kind }
     }
-  }
-
-  fn parse_lambda_type(&mut self, ty: &'a SynTy<'a>) -> &'a mut [Ty<'a>] {
-    let mut params = vec![];
-    // parse return type
-    if ty.rt.as_ref().unwrap().deref().kind == SynTyKind::Lambda { params.push(self.ty(ty.rt.as_ref().unwrap().deref(), false)); }
-    else { params.push(self.ty(ty.rt.as_ref().unwrap().deref(), false)); }
-    // parse params
-    for st in &ty.tl {
-      if st.kind == SynTyKind::Void { self.issue(st.loc, ArgumentCannotBeVoid) }
-      if st.kind == SynTyKind::Lambda { params.push(self.ty(st, false)); }
-      else { params.push(self.ty(st, false)); }
-    }
-    self.alloc.ty.alloc_extend(params)
   }
 }
 

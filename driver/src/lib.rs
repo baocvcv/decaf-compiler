@@ -3,8 +3,10 @@
 pub mod test_util;
 
 use common::{IndentPrinter, Errors};
-use syntax::{ASTAlloc, Ty, parser};
+use syntax::{ASTAlloc, Ty, parser, parser_ll};
 use typeck::TypeCkAlloc;
+use tacopt::bb::FuncBB;
+use codegen::mips_gen::FuncGen;
 use tac::TacNode;
 use typed_arena::Arena;
 
@@ -34,7 +36,7 @@ pub struct Alloc<'a> {
 pub fn compile<'a>(code: &'a str, alloc: &'a Alloc<'a>, cfg: CompileCfg) -> Result<String, Errors<'a, Ty<'a>>> {
   let mut p = IndentPrinter::default();
   let pr = match cfg.parser {
-    Parser::LL => unimplemented!(), //parser_ll::work(code, &alloc.ast)?,
+    Parser::LL => parser_ll::work(code, &alloc.ast)?,
     Parser::LR => parser::work(code, &alloc.ast)?,
   };
   if cfg.stage == Stage::Parse {
@@ -46,10 +48,28 @@ pub fn compile<'a>(code: &'a str, alloc: &'a Alloc<'a>, cfg: CompileCfg) -> Resu
     print::scope::program(&pr, &mut p);
     return Ok(p.finish());
   }
-  let tp = tacgen::work(&pr, &alloc.tac);
+  let mut tp = tacgen::work(&pr, &alloc.tac);
   if cfg.stage == Stage::Tac {
     print::tac::program(&tp, &mut p);
     return Ok(p.finish());
   }
-  unimplemented!()
+  if cfg.stage == Stage::Asm {
+    print::mips::data(&tp, &mut p);
+  }
+  let mut new_funcs = Vec::new();
+  for f in &tp.func {
+    let mut fu = FuncBB::new(f);
+    fu.optimizen(10);
+    if cfg.stage == Stage::Asm {
+      let asm = FuncGen::work(&fu, &tp, codegen::AllocMethod::Graph);
+      print::mips::func(&asm, &f.name, &mut p);
+    } else { // cfg.stage == Stage::TacOpt
+      new_funcs.push(fu.to_tac_func());
+    }
+  }
+  if cfg.stage == Stage::TacOpt {
+    tp.func = new_funcs;
+    print::tac::program(&tp, &mut p);
+    Ok(p.finish())
+  } else { Ok(p.finish() + include_str!("../../codegen/lib.s")) }
 }
