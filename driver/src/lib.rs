@@ -59,7 +59,7 @@ pub fn compile<'a>(code: &'a str, alloc: &'a Alloc<'a>, cfg: CompileCfg) -> Resu
   let mut new_funcs = Vec::new();
   for f in &tp.func {
     let mut fu = FuncBB::new(f);
-    fu.optimizen(10);
+    fu.optimizen(1);
     if cfg.stage == Stage::Asm {
       let asm = FuncGen::work(&fu, &tp, codegen::AllocMethod::Graph);
       print::mips::func(&asm, &f.name, &mut p);

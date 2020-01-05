@@ -10,6 +10,7 @@ pub struct BB<'a> {
   pub last: Option<&'a TacNode<'a>>,
   pub next: NextKind,
   pub prev: Vec<u32>,
+  pub next_vec: Vec<u32>,
 }
 
 #[derive(Copy, Clone)]
@@ -106,6 +107,10 @@ impl<'a> BB<'a> {
   pub fn prev_with_entry<'b>(&'b self, this: usize) -> (usize, impl IntoIterator<Item=usize> + Clone + 'b) {
     (this, self.prev.iter().map(|x| *x as usize + 1).chain(if this == 1 { Some(0) } else { None }))
   }
+
+  pub fn next_with_entry<'b>(&'b self, this: usize) -> (usize, impl IntoIterator<Item=usize> + Clone + 'b) {
+    (this, self.next_vec.iter().map(|x| *x as usize + 1).chain(if self.next_vec.len() == 0 { Some(0) } else { None }))
+  }
 }
 
 pub struct FuncBB<'a> {
@@ -187,7 +192,7 @@ impl<'a> FuncBB<'a> {
       if has_label { labels.push(bb.len() as u32); }
       if let Some(first) = first { first.prev.set(None); }
       if let Some(last) = last { last.next.set(None); }
-      bb.push(BB { len, first, last, next, prev: vec![] });
+      bb.push(BB { len, first, last, next, prev: vec![], next_vec: vec![] });
     }
     for unfill in labels {
       match &mut bb[unfill as usize].next {
@@ -251,10 +256,13 @@ pub(crate) fn simplify(mut bb: Vec<BB>) -> Vec<BB> {
   }
   let mut new = Vec::with_capacity(bb.len());
   for (_, mut b) in bb.into_iter().enumerate().filter(|(idx, _)| vis[*idx]) {
+    b.next_vec.clear();
     b.next = match b.next {
-      NextKind::Jmp(jump) => NextKind::Jmp(actual[jump as usize]),
-      NextKind::Jif { cond, z, fail, jump } =>
-        NextKind::Jif { cond, z, fail: actual[fail as usize], jump: actual[jump as usize] },
+      NextKind::Jmp(jump) => { b.next_vec.push(actual[jump as usize]); NextKind::Jmp(actual[jump as usize]) }
+      NextKind::Jif { cond, z, fail, jump } => {
+        b.next_vec.push(actual[fail as usize]); b.next_vec.push(actual[jump as usize]);
+        NextKind::Jif { cond, z, fail: actual[fail as usize], jump: actual[jump as usize] }
+      }
       n => n
     };
     b.prev.clear();
